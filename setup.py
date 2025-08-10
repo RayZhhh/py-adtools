@@ -4,7 +4,7 @@ with open('README.md', 'r', encoding='utf-8') as fh:
     long_description = fh.read()
 
 setup(
-    name='adtools',
+    name='py-adtools',
     version='0.1.0',
     author='Rui Zhang',
     author_email='rzhang.cs@gmail.com',
@@ -12,10 +12,9 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/RayZhhh/py-adtools',
-    packages=find_packages(),
+    packages=['adtools'],
     classifiers=[
         'Programming Language :: Python :: 3',
-        'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
         'Intended Audience :: Developers',
         'Topic :: Scientific/Engineering',
