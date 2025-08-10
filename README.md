@@ -23,7 +23,13 @@ The figure demonstrates how a Python program is parsed into `PyScript`, `PyFunct
 Run the following instructions to install adtools.
 
 ```shell
-pip install git+https://github.com/RayZhhh/py-adtools.git
+pip install git+https://github.com/RayZhhh/adtool.git
+```
+
+Or install via pip:
+
+```shell
+pip install py-adtools
 ```
 
 ## Usage
@@ -32,7 +38,6 @@ Parse your code (in string) into Python code instances.
 
 ```python
 from adtools import PyProgram
-
 
 code = r'''
 import ast
