@@ -14,6 +14,18 @@ The figure demonstrates how a Python program is parsed into `PyScript`, `PyFunct
 
 ------
 
+## Installation
+
+> [!TIP]
+>
+> It is recommended to use Python >= 3.10.
+
+Run the following instructions to install adtools.
+
+```shell
+pip install git+https://github.com/RayZhhh/py-adtools.git
+```
+
 ## Usage
 
 Parse your code (in string) into Python code instances.
