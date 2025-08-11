@@ -46,7 +46,7 @@ import ast, numba                 # This part will be parsed into PyScript
 import numpy as np
 
 @numba.jit()                      # This part will be parsed into PyFunction
-def funcion(arg1, arg2=True):     
+def function(arg1, arg2=True):     
     if arg2:
     	return arg1 * 2
     else:
@@ -56,17 +56,17 @@ def funcion(arg1, arg2=True):
 class PythonClass(BaseClass):
     class_var1 = 1                # This part will be parsed into PyScript
     class_varb = 2                # and placed in PyClass.class_vars_and_code
- 
+
     def __init__(self, x):        # This part will be parsed into PyFunction
         self.x = x                # and placed in PyClass.functions
-	
+
     def method1(self):
         return self.x * 10
-    
+
     @some.decorators()
     def method2(self, x, y):
     	return x + y + self.method1(x)
-    
+
     class InnerClass:             # This part will be parsed into PyScript
     	def __init__(self):       # and placed in PyClass.class_vars_and_code
     		...
@@ -74,13 +74,13 @@ class PythonClass(BaseClass):
 if __name__ == '__main__':        # This part will be parsed into PyScript
 	res = function(1)
 	print(res)
-	class = PythonClass()
+	res = PythonClass().method2(1, 2)
 '''
 
 p = PyProgram.from_text(code)
 print(p)
 print(f'-------------------------------------')
-print(p.classes[0].functions[0].decorator)
+print(p.classes[0].functions[2].decorator)
 print(f'-------------------------------------')
 print(p.functions[0].name)
 ```
