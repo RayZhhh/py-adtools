@@ -5,10 +5,10 @@ with open('README.md', 'r', encoding='utf-8') as fh:
 
 setup(
     name='py-adtools',
-    version='0.1.1',
+    version='0.1.2',
     author='Rui Zhang',
     author_email='rzhang.cs@gmail.com',
-    description='Useful tools for parsing Python programs for algorithm design.',
+    description='Useful tools for parsing and evaluating Python programs for algorithm design.',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/RayZhhh/py-adtools',
@@ -20,5 +20,5 @@ setup(
         'Topic :: Scientific/Engineering',
     ],
     python_requires='>=3.10',
-    install_requires=[],
+    install_requires=['psutil'],
 )

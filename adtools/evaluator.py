@@ -11,13 +11,12 @@ from .py_code import PyProgram
 
 
 class PyEvaluator(ABC):
-    """Python programs evaluator."""
 
     def __init__(self, debug_mode: bool = False, *, exec_code: bool = True):
-        """Evaluator interface for evaluating the python algorithm program.
+        """Evaluator interface for evaluating the Python algorithm program.
         Args:
-            debug_mode         : Debug mode.
-            exec_code          : Using 'exec()' to compile the code and provide the callable function.
+            debug_mode: Debug mode.
+            exec_code : Using 'exec()' to compile the code and provide the callable function.
         """
         self._debug_mode = debug_mode
         self._exec_code = exec_code
