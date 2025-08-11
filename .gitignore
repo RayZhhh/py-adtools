@@ -3,3 +3,5 @@ dist
 upload_to_pypi.sh
 .idea
 py_adtools.egg-info
+**/.DS_Store
+**/__pycache__
