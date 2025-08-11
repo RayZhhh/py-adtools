@@ -44,7 +44,7 @@ class PyFunction:
             # Here, we assume the indentation is always four spaces.
             new_line = '\n' if self.body else ''
             function += f'    """{self.docstring}"""{new_line}'
-        # self.body is already indented.
+        # The self.body is already indented.
         function += self.body + '\n\n'
         return function
 
@@ -109,7 +109,7 @@ class PyClass:
         # Ensure there aren't leading & trailing new lines in `body`
         if name == 'body':
             value = value.strip('\n')
-        # ensure there aren't leading & trailing quotes in `docstring`
+        # Ensure there aren't leading & trailing quotes in `docstring`
         if name == 'docstring' and value is not None:
             if '"""' in value:
                 value = value.strip()
@@ -189,7 +189,7 @@ class _ProgramVisitor(ast.NodeVisitor):
             if has_decorators:
                 # Find the minimum line number and retain the code above
                 decorator_start_line = min(decorator.lineno for decorator in node.decorator_list)
-                decorator = '\n'.join(self._codelines[decorator_start_line - 1: node.lineno - 1])
+                decorator = '\n'.join(self._codelines[decorator_start_line - 1: node.lineno - 1]).strip()
                 # Update script end line
                 script_end_line = decorator_start_line - 1
             else:
@@ -262,10 +262,10 @@ class _ProgramVisitor(ast.NodeVisitor):
                     if has_decorators:
                         # Find the minimum line number and retain the code above
                         decorator_start_line = min(decorator.lineno for decorator in item.decorator_list)
-                        # Dedent decorator code for 4 spaces
+                        # Dedent decorator code
                         decorator = []
                         for line in range(decorator_start_line - 1, item.lineno - 1):
-                            dedented_decorator = self._codelines[line][4:]
+                            dedented_decorator = self._codelines[line].strip()
                             decorator.append(dedented_decorator)
                         decorator = '\n'.join(decorator)
                     else:
