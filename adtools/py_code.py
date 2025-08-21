@@ -10,12 +10,12 @@ import dataclasses
 import textwrap
 from typing import List, Optional
 
-__all__ = ['PyScript', 'PyFunction', 'PyClass', 'PyProgram']
+__all__ = ['PyCodeBlock', 'PyFunction', 'PyClass', 'PyProgram']
 
 
 @dataclasses.dataclass
-class PyScript:
-    """A parsed Python script block (top-level code that's not in classes/functions).
+class PyCodeBlock:
+    """A parsed Python code block (e.g., top-level code that's not in classes/functions).
     """
     code: str
 
@@ -82,10 +82,10 @@ class PyClass:
     decorator: str
     name: str
     bases: str
-    class_vars_and_code: List[PyScript] = None
+    class_vars_and_code: List[PyCodeBlock] = None
     docstring: str | None = None
     functions: list[PyFunction] = dataclasses.field(default_factory=list)
-    functions_class_vars_and_code: List[PyScript | PyFunction] | None = None
+    functions_class_vars_and_code: List[PyCodeBlock | PyFunction] | None = None
 
     def __str__(self) -> str:
         class_def = f'{self.decorator}\nclass {self.name}'
@@ -97,7 +97,7 @@ class PyClass:
             class_def += f'    """{self.docstring}"""\n'
 
         for item in self.functions_class_vars_and_code:
-            if isinstance(item, PyScript):
+            if isinstance(item, PyCodeBlock):
                 class_def += f'{str(item)}\n'
             else:
                 # Add functions with an extra level of indentation
@@ -137,10 +137,10 @@ class PyClass:
 class PyProgram:
     """A parsed Python program."""
 
-    scripts: list[PyScript]  # Top-level code that's not in classes/functions
+    scripts: list[PyCodeBlock]  # Top-level code that's not in classes/functions
     functions: list[PyFunction]  # Top-level functions in the code
     classes: list[PyClass]  # Top-level classes in the code
-    classes_functions_scripts: list[PyFunction | PyClass | PyScript]
+    classes_functions_scripts: list[PyFunction | PyClass | PyCodeBlock]
 
     def __str__(self) -> str:
         program = ''
@@ -149,7 +149,7 @@ class PyProgram:
         return program
 
     @classmethod
-    def from_text(cls, text: str) -> Optional['PyProgram']:
+    def from_text(cls, text: str) -> 'PyProgram':
         tree = ast.parse(text)
         visitor = _ProgramVisitor(text)
         visitor.visit(tree)
@@ -163,10 +163,10 @@ class _ProgramVisitor(ast.NodeVisitor):
 
     def __init__(self, sourcecode: str):
         self._codelines: list[str] = sourcecode.splitlines()
-        self._scripts: list[PyScript] = []
+        self._scripts: list[PyCodeBlock] = []
         self._functions: list[PyFunction] = []
         self._classes: list[PyClass] = []
-        self._classes_functions_scripts: list[PyFunction | PyClass | PyScript] = []
+        self._classes_functions_scripts: list[PyFunction | PyClass | PyCodeBlock] = []
         self._last_script_end = 0
 
     def _add_script(self, start_line: int, end_line: int):
@@ -175,7 +175,7 @@ class _ProgramVisitor(ast.NodeVisitor):
             return
         script_code = '\n'.join(self._codelines[start_line:end_line]).strip()
         if script_code:
-            script = PyScript(code=script_code)
+            script = PyCodeBlock(code=script_code)
             self._scripts.append(script)
             self._classes_functions_scripts.append(script)
 
@@ -204,6 +204,7 @@ class _ProgramVisitor(ast.NodeVisitor):
             body_start_line = node.body[0].lineno - 1
             docstring = None
 
+            # If the first node is ast.Expr, we regard it as a docstring
             if isinstance(node.body[0], ast.Expr) and isinstance(node.body[0].value, ast.Constant):
                 docstring = ast.literal_eval(ast.unparse(node.body[0])).strip()
                 if len(node.body) > 1:
@@ -211,6 +212,7 @@ class _ProgramVisitor(ast.NodeVisitor):
                 else:
                     body_start_line = function_end_line
 
+            # Return a PyFunction instance
             func = PyFunction(
                 decorator=decorator,
                 name=node.name,
@@ -300,17 +302,18 @@ class _ProgramVisitor(ast.NodeVisitor):
                     )
                     methods.append(py_func)
                     function_class_vars_and_code.append(py_func)
-                else:  # If the item is not a function definition,add to class variables and code
+                else:  # If the item is not a function definition, add to class variables and code
                     code = []
                     for i in range(item.lineno - 1, item.end_lineno):
                         code.append(self._codelines[i])
-                    py_script = PyScript(code='\n'.join(code))
+                    py_script = PyCodeBlock(code='\n'.join(code))
                     class_vars_and_code.append(py_script)
                     function_class_vars_and_code.append(py_script)
 
             # Get base classes
             bases = ', '.join([ast.unparse(base) for base in node.bases]) if node.bases else ''
 
+            # Return a PyClass instance
             class_ = PyClass(
                 decorator=class_decorator,
                 name=node.name,

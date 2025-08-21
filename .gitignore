@@ -5,3 +5,4 @@ upload_to_pypi.sh
 py_adtools.egg-info
 **/.DS_Store
 **/__pycache__
+remove_files.sh

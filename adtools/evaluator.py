@@ -1,7 +1,13 @@
+"""
+Copyright (c) 2025 Rui Zhang <rzhang.cs@gmail.com>
+
+NOTICE: This code is under MIT license. This code is intended for academic/research purposes only.
+Commercial use of this software or its derivatives requires prior written permission.
+"""
+
 import multiprocessing
 import os
 import sys
-import time
 from abc import ABC, abstractmethod
 from queue import Empty
 from typing import Any, Literal, Dict, Callable, List
@@ -12,15 +18,26 @@ from .py_code import PyProgram
 
 class PyEvaluator(ABC):
 
-    def __init__(self, debug_mode: bool = False, *, exec_code: bool = True):
-        """Evaluator interface for evaluating the Python algorithm program.
+    def __init__(
+            self,
+            exec_code: bool = True,
+            debug_mode: bool = False,
+            *,
+            join_timeout_seconds: int = 10
+    ):
+        """Evaluator interface for evaluating the Python algorithm program. Override this class and implement
+        'evaluate_program' method, then invoke 'self.evaluate()' or 'self.secure_evaluate()' for evaluation.
         Args:
+            exec_code: Using 'exec()' to execute the program code and obtain the callable functions and classes,
+                which will be passed to 'self.evaluate_program()'. Set this parameter to 'False' if you are going to
+                evaluate a Python scripy. Note that if the parameter is set to 'False', the arguments 'callable_...'
+                in 'self.evaluate_program()' will no longer be affective.
             debug_mode: Debug mode.
-            exec_code : Using 'exec()' to compile the code and provide the callable function.
+            join_timeout_seconds: Timeout in seconds to wait for the process to finish. Kill the process if timeout.
         """
         self._debug_mode = debug_mode
         self._exec_code = exec_code
-        self._JOIN_TIMEOUT_SECONDS = 5
+        self._join_timeout_seconds = join_timeout_seconds
 
     @abstractmethod
     def evaluate_program(
@@ -31,19 +48,21 @@ class PyEvaluator(ABC):
             callable_classes_dict: Dict[str, Callable] | None,
             callable_classes_list: List[Callable] | None,
             **kwargs
-    ) -> Any | None:
+    ) -> Any:
         """Evaluate a given program.
         Args:
-            program_str            : The raw program text.
+            program_str: The raw program text.
             callable_functions_dict: A dict maps function name to callable function.
             callable_functions_list: A list of callable functions.
-            callable_classes_dict  : A dict maps class name to callable class.
-            callable_classes_list  : A list of callable classes.
-        Return:
+            callable_classes_dict: A dict maps class name to callable class.
+            callable_classes_list: A list of callable classes.
+        Returns:
             Returns the evaluation result.
         """
-        raise NotImplementedError('Must provide an evaluator for a python program. '
-                                  'Override this method in a subclass.')
+        raise NotImplementedError(
+            'Must provide an evaluator for a python program. '
+            'Override this method in a subclass.'
+        )
 
     def _kill_process_and_its_children(self, process: multiprocessing.Process):
         # Find all children processes
@@ -54,7 +73,7 @@ class PyEvaluator(ABC):
             children_processes = []
         # Terminate parent process
         process.terminate()
-        process.join(timeout=self._JOIN_TIMEOUT_SECONDS)
+        process.join(timeout=self._join_timeout_seconds)
         if process.is_alive():
             process.kill()
             process.join()
@@ -64,17 +83,23 @@ class PyEvaluator(ABC):
                 print(f"Killing process {process.pid}'s children process {child.pid}")
             child.terminate()
 
-    def evaluate(self, program_str: str, **kwargs):
+    def evaluate(self, program: str | PyProgram, **kwargs):
+        """Evaluate program.
+        Args:
+            program: the program to be evaluated.
+            **kwargs: additional keyword arguments to pass to 'evaluate_program'.
+        """
         try:
             # Parse to program instance
-            program = PyProgram.from_text(program_str)
+            if isinstance(program, str):
+                program = PyProgram.from_text(program)
             function_names = [f.name for f in program.functions]
             class_names = [c.name for c in program.classes]
+            # Execute the code and get callable instances
             if self._exec_code:
-                # Compile the program, and maps the global func/var/class name to its address
                 all_globals_namespace = {}
                 # Execute the program, map func/var/class to global namespace
-                exec(program_str, all_globals_namespace)
+                exec(str(program), all_globals_namespace)
                 # Get callable functions
                 callable_functions_list = [all_globals_namespace[f_name] for f_name in function_names]
                 callable_functions_dict = dict(zip(function_names, callable_functions_list))
@@ -89,7 +114,7 @@ class PyEvaluator(ABC):
 
             # Get evaluate result
             res = self.evaluate_program(
-                program_str,
+                str(program),
                 callable_functions_dict,
                 callable_functions_list,
                 callable_classes_dict,
@@ -121,23 +146,24 @@ class PyEvaluator(ABC):
             program: str | PyProgram,
             timeout_seconds: int | float = None,
             redirect_to_devnull: bool = True,
-            multiprocessing_start_method=Literal['auto', 'fork', 'spawn'],
+            multiprocessing_start_method: Literal['default', 'auto', 'fork', 'spawn'] = 'auto',
             **kwargs
     ):
-        """
+        """Evaluate program in a new process. This enables timeout restriction and output redirection.
         Args:
             program: the program to be evaluated.
             timeout_seconds: return 'None' if the execution time exceeds 'timeout_seconds'.
             redirect_to_devnull: redirect any output to '/dev/null'.
             multiprocessing_start_method: start a process using 'fork' or 'spawn'.
+            **kwargs: additional keyword arguments to pass to 'evaluate_program'.
         """
         if multiprocessing_start_method == 'auto':
-            # Force MacOS and Linux use 'fork' to generate new process
+            # Force macOS and Linux use 'fork' to generate new process
             if sys.platform.startswith('darwin') or sys.platform.startswith('linux'):
                 multiprocessing.set_start_method('fork', force=True)
         elif multiprocessing_start_method == 'fork':
             multiprocessing.set_start_method('fork', force=True)
-        else:
+        elif multiprocessing_start_method == 'spawn':
             multiprocessing.set_start_method('spawn', force=True)
 
         try:
