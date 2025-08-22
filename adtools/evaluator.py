@@ -84,7 +84,7 @@ class PyEvaluator(ABC):
             child.terminate()
 
     def evaluate(self, program: str | PyProgram, **kwargs):
-        """Evaluate program.
+        """Evaluate a program.
         Args:
             program: the program to be evaluated.
             **kwargs: additional keyword arguments to pass to 'evaluate_program'.
@@ -134,9 +134,9 @@ class PyEvaluator(ABC):
             redirect_to_devnull: bool,
             **kwargs
     ):
-        # Redirect STDOUT to '/dev/null'
+        # Redirect STDOUT and STDERR to '/dev/null'
         if redirect_to_devnull:
-            with open('/dev/null', 'w') as devnull:
+            with open(os.devnull, 'w') as devnull:
                 os.dup2(devnull.fileno(), sys.stdout.fileno())
                 os.dup2(devnull.fileno(), sys.stderr.fileno())
 
@@ -157,7 +157,9 @@ class PyEvaluator(ABC):
             program: the program to be evaluated.
             timeout_seconds: return 'None' if the execution time exceeds 'timeout_seconds'.
             redirect_to_devnull: redirect any output to '/dev/null'.
-            multiprocessing_start_method: start a process using 'fork' or 'spawn'.
+            multiprocessing_start_method: start a process using 'fork' or 'spawn'. If set to 'auto',
+                the process will be started using 'fork' with Linux/macOS and 'spawn' with Windows.
+                If set to 'default', there will be no changes to system default.
             **kwargs: additional keyword arguments to pass to 'evaluate_program'.
         """
         if multiprocessing_start_method == 'auto':

@@ -69,6 +69,7 @@ def merge(left, right):
 
 harmful_code_generated_by_llm = '''
 def merge_sort(arr):
+    print('I am harmful')  # There will be no output since we redirect STDOUT to /dev/null by default.
     while True:
         pass
 '''
