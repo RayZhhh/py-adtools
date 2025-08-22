@@ -13,8 +13,9 @@ def function(arg1, arg2=True):
 
 @some.decorators()                # This part will be parsed into PyClass
 class PythonClass(BaseClass):
+    
     class_var1 = 1                # This part will be parsed into PyCodeBlock
-    class_varb = 2                # and placed in PyClass.class_vars_and_code
+    class_var2 = 2                # and placed in PyClass.class_vars_and_code
 
     def __init__(self, x):        # This part will be parsed into PyFunction
         self.x = x                # and placed in PyClass.functions

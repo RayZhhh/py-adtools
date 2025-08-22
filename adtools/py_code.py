@@ -20,14 +20,17 @@ class PyCodeBlock:
     code: str
 
     def __str__(self) -> str:
-        return self.code + '\n'
+        return self.code
+
+    def __repr__(self) -> str:
+        return self.__str__() + '\n'
 
 
 @dataclasses.dataclass
 class PyFunction:
     """A parsed Python function.
-    > Part of this class is referenced from:
-    > https://github.com/google-deepmind/funsearch/blob/main/implementation/code_manipulation.py
+    Part of this class is referenced from:
+    https://github.com/google-deepmind/funsearch/blob/main/implementation/code_manipulation.py
     """
     decorator: str
     name: str
@@ -38,15 +41,19 @@ class PyFunction:
 
     def __str__(self) -> str:
         return_type = f' -> {self.return_type}' if self.return_type else ''
-        function = f'{self.decorator}\ndef {self.name}({self.args}){return_type}:\n'
+        function = f'{self.decorator}\n' if self.decorator else ''
+        function += f'def {self.name}({self.args}){return_type}:\n'
         if self.docstring:
             # The self.docstring is already indented on every line except the first one.
-            # Here, we assume the indentation is always four spaces.
+            # Here, we assume the indentation is always 4 spaces.
             new_line = '\n' if self.body else ''
             function += f'    """{self.docstring}"""{new_line}'
         # The self.body is already indented.
-        function += self.body + '\n\n'
+        function += self.body
         return function
+
+    def __repr__(self) -> str:
+        return self.__str__() + '\n\n'
 
     def __setattr__(self, name: str, value: str) -> None:
         # Ensure there aren't leading & trailing new lines in `body`
@@ -88,7 +95,8 @@ class PyClass:
     functions_class_vars_and_code: List[PyCodeBlock | PyFunction] | None = None
 
     def __str__(self) -> str:
-        class_def = f'{self.decorator}\nclass {self.name}'
+        class_def = f'{self.decorator}\n' if self.decorator else ''
+        class_def += f'class {self.name}'
         if self.bases:
             class_def += f'({self.bases})'
         class_def += ':\n'
@@ -96,14 +104,20 @@ class PyClass:
         if self.docstring:
             class_def += f'    """{self.docstring}"""\n'
 
-        for item in self.functions_class_vars_and_code:
+        for i, item in enumerate(self.functions_class_vars_and_code):
             if isinstance(item, PyCodeBlock):
-                class_def += f'{str(item)}\n'
+                # The PyCodeBlock has already indented
+                class_def += f'{str(item)}'
             else:
                 # Add functions with an extra level of indentation
                 class_def += textwrap.indent(str(item).strip(), '    ')
+            # Add '\n\n' if this is not the last element
+            if i != len(self.functions_class_vars_and_code) - 1:
                 class_def += '\n\n'
         return class_def
+
+    def __repr__(self):
+        return self.__str__() + '\n\n'
 
     def __setattr__(self, name: str, value: str) -> None:
         # Ensure there aren't leading & trailing new lines in `body`
@@ -145,7 +159,7 @@ class PyProgram:
     def __str__(self) -> str:
         program = ''
         for class_or_func_or_script in self.classes_functions_scripts:
-            program += str(class_or_func_or_script) + '\n'
+            program += str(class_or_func_or_script) + '\n\n'
         return program
 
     @classmethod
@@ -169,11 +183,23 @@ class _ProgramVisitor(ast.NodeVisitor):
         self._classes_functions_scripts: list[PyFunction | PyClass | PyCodeBlock] = []
         self._last_script_end = 0
 
+    def _get_code(self, start_line: int, end_line: int, dedent=False):
+        """Get code between start_line and end_line in 'self._codelines'.
+        """
+        code = []
+        for line in self._codelines[start_line: end_line]:
+            if dedent:
+                code.append(line[4:])
+            else:
+                code.append(line)
+        return '\n'.join(code).rstrip()
+
     def _add_script(self, start_line: int, end_line: int):
-        """Add a script segment from the code."""
+        """Add a script segment from the code.
+        """
         if start_line >= end_line:
             return
-        script_code = '\n'.join(self._codelines[start_line:end_line]).strip()
+        script_code = self._get_code(start_line, end_line).strip()
         if script_code:
             script = PyCodeBlock(code=script_code)
             self._scripts.append(script)
@@ -189,11 +215,11 @@ class _ProgramVisitor(ast.NodeVisitor):
             if has_decorators:
                 # Find the minimum line number and retain the code above
                 decorator_start_line = min(decorator.lineno for decorator in node.decorator_list)
-                decorator = '\n'.join(self._codelines[decorator_start_line - 1: node.lineno - 1]).strip()
+                decorator = self._get_code(decorator_start_line - 1, node.lineno - 1)
                 # Update script end line
                 script_end_line = decorator_start_line - 1
             else:
-                decorator = ''
+                decorator = None
                 script_end_line = node.lineno - 1
 
             # Add any script code before this function
@@ -219,7 +245,7 @@ class _ProgramVisitor(ast.NodeVisitor):
                 args=ast.unparse(node.args),
                 return_type=ast.unparse(node.returns) if node.returns else None,
                 docstring=docstring,
-                body='\n'.join(self._codelines[body_start_line: function_end_line]),
+                body=self._get_code(body_start_line, function_end_line)
             )
 
             self._functions.append(func)
@@ -236,11 +262,11 @@ class _ProgramVisitor(ast.NodeVisitor):
             if has_decorators:
                 # Find the minimum line number and retain the code above
                 decorator_start_line = min(decorator.lineno for decorator in node.decorator_list)
-                class_decorator = '\n'.join(self._codelines[decorator_start_line - 1: node.lineno - 1])
+                class_decorator = self._get_code(decorator_start_line - 1, node.lineno - 1)
                 # Update script end line
                 script_end_line = decorator_start_line - 1
             else:
-                class_decorator = ''
+                class_decorator = None
                 script_end_line = node.lineno - 1
 
             # Add any script code before this class
@@ -252,9 +278,12 @@ class _ProgramVisitor(ast.NodeVisitor):
             if isinstance(node.body[0], ast.Expr) and isinstance(node.body[0].value, ast.Constant):
                 docstring = ast.literal_eval(ast.unparse(node.body[0]))
 
+            # Record methods
             methods = []
+            # Record class variables or code that are not methods
             class_vars_and_code = []
-            function_class_vars_and_code = []  # record the order of function and class vars and code
+            # Record the order of function and class vars and code
+            function_class_vars_and_code = []
 
             # Traverse each body, if there is a docstring, skip body[0]
             for item in node.body if docstring is None else node.body[1:]:
@@ -265,13 +294,9 @@ class _ProgramVisitor(ast.NodeVisitor):
                         # Find the minimum line number and retain the code above
                         decorator_start_line = min(decorator.lineno for decorator in item.decorator_list)
                         # Dedent decorator code
-                        decorator = []
-                        for line in range(decorator_start_line - 1, item.lineno - 1):
-                            dedented_decorator = self._codelines[line].strip()
-                            decorator.append(dedented_decorator)
-                        decorator = '\n'.join(decorator)
+                        decorator = self._get_code(decorator_start_line - 1, item.lineno - 1, dedent=True)
                     else:
-                        decorator = ''
+                        decorator = None
 
                     method_end_line = item.end_lineno
                     method_body_start_line = item.body[0].lineno - 1
@@ -286,11 +311,7 @@ class _ProgramVisitor(ast.NodeVisitor):
                             method_body_start_line = method_end_line
 
                     # Extract function body and dedent for 4 spaces
-                    body = []
-                    for line in range(method_body_start_line, method_end_line):
-                        dedented_body = self._codelines[line][4:]
-                        body.append(dedented_body)
-                    body = '\n'.join(body)
+                    body = self._get_code(method_body_start_line, method_end_line, dedent=True)
 
                     py_func = PyFunction(
                         decorator=decorator,
@@ -303,15 +324,13 @@ class _ProgramVisitor(ast.NodeVisitor):
                     methods.append(py_func)
                     function_class_vars_and_code.append(py_func)
                 else:  # If the item is not a function definition, add to class variables and code
-                    code = []
-                    for i in range(item.lineno - 1, item.end_lineno):
-                        code.append(self._codelines[i])
-                    py_script = PyCodeBlock(code='\n'.join(code))
+                    code = self._get_code(item.lineno - 1, item.end_lineno)
+                    py_script = PyCodeBlock(code=code)
                     class_vars_and_code.append(py_script)
                     function_class_vars_and_code.append(py_script)
 
             # Get base classes
-            bases = ', '.join([ast.unparse(base) for base in node.bases]) if node.bases else ''
+            bases = ', '.join([ast.unparse(base) for base in node.bases]) if node.bases else None
 
             # Return a PyClass instance
             class_ = PyClass(
