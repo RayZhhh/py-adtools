@@ -95,30 +95,30 @@ class PyEvaluator(ABC):
                 program = PyProgram.from_text(program)
             function_names = [f.name for f in program.functions]
             class_names = [c.name for c in program.classes]
+
             # Execute the code and get callable instances
             if self._exec_code:
                 all_globals_namespace = {}
                 # Execute the program, map func/var/class to global namespace
                 exec(str(program), all_globals_namespace)
                 # Get callable functions
-                callable_functions_list = [all_globals_namespace[f_name] for f_name in function_names]
-                callable_functions_dict = dict(zip(function_names, callable_functions_list))
+                callable_funcs_list = [all_globals_namespace[f_name] for f_name in function_names]
+                callable_funcs_dict = dict(zip(function_names, callable_funcs_list))
                 # Get callable classes
-                callable_classes_list = [all_globals_namespace[c_name] for c_name in class_names]
-                callable_classes_dict = dict(zip(class_names, callable_classes_list))
+                callable_cls_list = [all_globals_namespace[c_name] for c_name in class_names]
+                callable_cls_dict = dict(zip(class_names, callable_cls_list))
             else:
-                callable_functions_list = None
-                callable_functions_dict = None
-                callable_classes_list = None
-                callable_classes_dict = None
+                callable_funcs_list, callable_funcs_dict, callable_cls_list, callable_cls_dict = (
+                    None, None, None, None
+                )
 
             # Get evaluate result
             res = self.evaluate_program(
                 str(program),
-                callable_functions_dict,
-                callable_functions_list,
-                callable_classes_dict,
-                callable_classes_list,
+                callable_funcs_dict,
+                callable_funcs_list,
+                callable_cls_dict,
+                callable_cls_list,
                 **kwargs
             )
             return res
@@ -134,10 +134,13 @@ class PyEvaluator(ABC):
             redirect_to_devnull: bool,
             **kwargs
     ):
+        # Redirect STDOUT to '/dev/null'
         if redirect_to_devnull:
             with open('/dev/null', 'w') as devnull:
                 os.dup2(devnull.fileno(), sys.stdout.fileno())
                 os.dup2(devnull.fileno(), sys.stderr.fileno())
+
+        # Evaluate and put the results to the queue
         res = self.evaluate(program_str, **kwargs)
         result_queue.put(res)
 
@@ -182,19 +185,22 @@ class PyEvaluator(ABC):
                     result = result_queue.get(timeout=timeout_seconds)
                     # After getting the result, terminate/kill the process
                     self._kill_process_and_its_children(process)
-                except Empty:
-                    # Timeout
+                except Empty:  # The queue is empty indicates a timeout
                     if self._debug_mode:
                         print(f'DEBUG: the evaluation time exceeds {timeout_seconds}s.')
+                    # Terminate/kill all processes if timeout happens
                     self._kill_process_and_its_children(process)
                     result = None
                 except Exception as e:
                     if self._debug_mode:
                         print(f'DEBUG: evaluation failed with exception:\n{e}')
+                    # Terminate/kill all processes if meet exceptions
                     self._kill_process_and_its_children(process)
                     result = None
             else:
+                # If there is no timeout limit, wait execution to finish
                 result = result_queue.get()
+                # Terminate/kill all processes after evaluation
                 self._kill_process_and_its_children(process)
             return result
         except Exception as e:
