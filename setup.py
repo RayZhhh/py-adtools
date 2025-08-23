@@ -20,5 +20,5 @@ setup(
         'Topic :: Scientific/Engineering',
     ],
     python_requires='>=3.10',
-    install_requires=['psutil'],
+    install_requires=['psutil', 'openai'],
 )
