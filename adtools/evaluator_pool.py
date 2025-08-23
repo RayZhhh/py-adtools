@@ -26,12 +26,12 @@ class EvaluatorExecutorPool:
             max_workers: The maximum number of workers.
             pool_type: Type of the executor pool.
         """
-        self._evaluator = evaluator
-        self._max_workers = max_workers
+        self.evaluator = evaluator
+        self.max_workers = max_workers
         if pool_type == 'thread':
-            self._pool = ThreadPoolExecutor(max_workers=self._max_workers)
+            self.pool = ThreadPoolExecutor(max_workers=self.max_workers)
         else:
-            self._pool = ProcessPoolExecutor(max_workers=self._max_workers)
+            self.pool = ProcessPoolExecutor(max_workers=self.max_workers)
 
     def evaluate(self, program: str | PyProgram, return_time=True, **kwargs):
         """Evaluate program.
@@ -40,7 +40,7 @@ class EvaluatorExecutorPool:
             **kwargs: additional keyword arguments to pass to 'evaluate_program'.
         """
         start_time = time.time()
-        future = self._pool.submit(self._evaluator.evaluate, program, **kwargs)
+        future = self.pool.submit(self.evaluator.evaluate, program, **kwargs)
         res = future.result()
         duration = time.time() - start_time
         if return_time:
@@ -52,7 +52,7 @@ class EvaluatorExecutorPool:
             self,
             program: str | PyProgram,
             timeout_seconds: Optional[float],
-            redirect_to_devnull: bool = True,
+            redirect_to_devnull: bool = False,
             multiprocessing_start_method: Literal['default', 'auto', 'fork', 'spawn'] = 'auto',
             return_time=True,
             **kwargs
@@ -66,8 +66,8 @@ class EvaluatorExecutorPool:
             **kwargs: additional keyword arguments to pass to 'evaluate_program'.
         """
         start_time = time.time()
-        future = self._pool.submit(
-            self._evaluator.secure_evaluate,
+        future = self.pool.submit(
+            self.evaluator.secure_evaluate,
             program,
             timeout_seconds,
             redirect_to_devnull,

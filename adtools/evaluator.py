@@ -35,9 +35,9 @@ class PyEvaluator(ABC):
             debug_mode: Debug mode.
             join_timeout_seconds: Timeout in seconds to wait for the process to finish. Kill the process if timeout.
         """
-        self._debug_mode = debug_mode
-        self._exec_code = exec_code
-        self._join_timeout_seconds = join_timeout_seconds
+        self.debug_mode = debug_mode
+        self.exec_code = exec_code
+        self.join_timeout_seconds = join_timeout_seconds
 
     @abstractmethod
     def evaluate_program(
@@ -73,13 +73,13 @@ class PyEvaluator(ABC):
             children_processes = []
         # Terminate parent process
         process.terminate()
-        process.join(timeout=self._join_timeout_seconds)
+        process.join(timeout=self.join_timeout_seconds)
         if process.is_alive():
             process.kill()
             process.join()
         # Kill all children processes
         for child in children_processes:
-            if self._debug_mode:
+            if self.debug_mode:
                 print(f"Killing process {process.pid}'s children process {child.pid}")
             child.terminate()
 
@@ -97,7 +97,7 @@ class PyEvaluator(ABC):
             class_names = [c.name for c in program.classes]
 
             # Execute the code and get callable instances
-            if self._exec_code:
+            if self.exec_code:
                 all_globals_namespace = {}
                 # Execute the program, map func/var/class to global namespace
                 exec(str(program), all_globals_namespace)
@@ -123,7 +123,7 @@ class PyEvaluator(ABC):
             )
             return res
         except Exception as e:
-            if self._debug_mode:
+            if self.debug_mode:
                 print(e)
             return None
 
@@ -148,7 +148,7 @@ class PyEvaluator(ABC):
             self,
             program: str | PyProgram,
             timeout_seconds: int | float = None,
-            redirect_to_devnull: bool = True,
+            redirect_to_devnull: bool = False,
             multiprocessing_start_method: Literal['default', 'auto', 'fork', 'spawn'] = 'auto',
             **kwargs
     ):
@@ -188,13 +188,13 @@ class PyEvaluator(ABC):
                     # After getting the result, terminate/kill the process
                     self._kill_process_and_its_children(process)
                 except Empty:  # The queue is empty indicates a timeout
-                    if self._debug_mode:
+                    if self.debug_mode:
                         print(f'DEBUG: the evaluation time exceeds {timeout_seconds}s.')
                     # Terminate/kill all processes if timeout happens
                     self._kill_process_and_its_children(process)
                     result = None
                 except Exception as e:
-                    if self._debug_mode:
+                    if self.debug_mode:
                         print(f'DEBUG: evaluation failed with exception:\n{e}')
                     # Terminate/kill all processes if meet exceptions
                     self._kill_process_and_its_children(process)
@@ -206,6 +206,6 @@ class PyEvaluator(ABC):
                 self._kill_process_and_its_children(process)
             return result
         except Exception as e:
-            if self._debug_mode:
+            if self.debug_mode:
                 print(e)
             return None
