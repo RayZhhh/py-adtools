@@ -39,7 +39,7 @@ pip install py-adtools
 Parse your code (in string) into Python code instances, so that you can check each component and modify it.
 
 ```python
-from _ignore_files.adtools import PyProgram
+from adtools import PyProgram
 
 code = r'''
 import ast, numba                 # This part will be parsed into PyCodeBlock
@@ -54,8 +54,9 @@ def function(arg1, arg2=True):
 
 @some.decorators()                # This part will be parsed into PyClass
 class PythonClass(BaseClass):
+    
     class_var1 = 1                # This part will be parsed into PyCodeBlock
-    class_varb = 2                # and placed in PyClass.class_vars_and_code
+    class_var2 = 2                # and placed in PyClass.class_vars_and_code
 
     def __init__(self, x):        # This part will be parsed into PyFunction
         self.x = x                # and placed in PyClass.functions
@@ -96,7 +97,7 @@ Evaluate Python programs in a secure process to avoid the abortation of the main
 import time
 from typing import Dict, Callable, List, Any
 
-from _ignore_files.adtools import PyEvaluator
+from adtools import PyEvaluator
 
 
 class SortAlgorithmEvaluator(PyEvaluator):
@@ -164,6 +165,7 @@ def merge(left, right):
 
 harmful_code_generated_by_llm = '''
 def merge_sort(arr):
+    print('I am harmful')  # There will be no output since we redirect STDOUT to /dev/null by default.
     while True:
         pass
 '''
