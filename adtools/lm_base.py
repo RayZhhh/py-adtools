@@ -115,7 +115,7 @@ def _print_cmd_list(cmd_list, gpus, host, port):
     print('=' * 80 + '\n', flush=True)
 
 
-class VLLMServer:
+class VLLMServer(LanguageModel):
     def __init__(self,
                  model_path: str,
                  port: int,

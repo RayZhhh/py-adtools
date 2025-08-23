@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 from queue import Empty
 from typing import Any, Literal, Dict, Callable, List
 import psutil
+import traceback
 
 from .py_code import PyProgram
 
@@ -124,7 +125,7 @@ class PyEvaluator(ABC):
             return res
         except Exception as e:
             if self.debug_mode:
-                print(e)
+                print(traceback.format_exc())
             return None
 
     def _evaluate_in_safe_process(
@@ -195,7 +196,7 @@ class PyEvaluator(ABC):
                     result = None
                 except Exception as e:
                     if self.debug_mode:
-                        print(f'DEBUG: evaluation failed with exception:\n{e}')
+                        print(f'DEBUG: evaluation failed with exception:\n{traceback.format_exc()}')
                     # Terminate/kill all processes if meet exceptions
                     self._kill_process_and_its_children(process)
                     result = None
@@ -207,5 +208,5 @@ class PyEvaluator(ABC):
             return result
         except Exception as e:
             if self.debug_mode:
-                print(e)
+                print(traceback.format_exc())
             return None
