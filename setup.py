@@ -5,14 +5,14 @@ with open('README.md', 'r', encoding='utf-8') as fh:
 
 setup(
     name='py-adtools',
-    version='0.1.5',
+    version='0.1.6',
     author='Rui Zhang',
     author_email='rzhang.cs@gmail.com',
     description='Useful tools for parsing and evaluating Python programs for LLM-based algorithm design.',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/RayZhhh/py-adtools',
-    packages=['adtools'],
+    packages=['adtools', 'adtools.*'],
     classifiers=[
         'Programming Language :: Python :: 3',
         'Operating System :: OS Independent',
