@@ -10,6 +10,11 @@ try:
 except ImportError:
     raise ImportError('Python package "vllm" is not installed.')
 
+try:
+    import openai.types.chat
+except ImportError:
+    raise ImportError('Python package "openai" is not installed.')
+
 from typing import Optional, List, Literal, Dict, Any
 import os
 import subprocess
@@ -19,7 +24,6 @@ import psutil
 import time
 
 import requests
-import openai.types.chat
 
 from .lm_base import LanguageModel
 
@@ -36,23 +40,25 @@ def _print_cmd_list(cmd_list, gpus, host, port):
 
 
 class VLLMServer(LanguageModel):
-    def __init__(self,
-                 model_path: str,
-                 port: int,
-                 gpus: int | list[int],
-                 tokenizer_path: Optional[str] = None,
-                 max_model_len: int = 16384,
-                 max_lora_rank: Optional[int] = None,
-                 host: str = '0.0.0.0',
-                 mem_util: float = 0.85,
-                 deploy_timeout_seconds: int = 600,
-                 enforce_eager: bool = False,
-                 vllm_log_level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] = 'INFO',
-                 silent_mode: bool = False,
-                 env_variable_dict: Optional[Dict[str, str]] = None,
-                 vllm_serve_args: Optional[List[str]] = None,
-                 vllm_serve_kwargs: Optional[Dict[str, str]] = None,
-                 chat_template_kwargs: Optional[Dict[str, Any]] = None):
+    def __init__(
+            self,
+            model_path: str,
+            port: int,
+            gpus: int | list[int],
+            tokenizer_path: Optional[str] = None,
+            max_model_len: int = 16384,
+            max_lora_rank: Optional[int] = None,
+            host: str = '0.0.0.0',
+            mem_util: float = 0.85,
+            deploy_timeout_seconds: int = 600,
+            enforce_eager: bool = False,
+            vllm_log_level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] = 'INFO',
+            silent_mode: bool = False,
+            env_variable_dict: Optional[Dict[str, str]] = None,
+            vllm_serve_args: Optional[List[str]] = None,
+            vllm_serve_kwargs: Optional[Dict[str, str]] = None,
+            chat_template_kwargs: Optional[Dict[str, Any]] = None
+    ):
         """Deploy an LLM on specified GPUs.
         Args:
             model_path: Path to the model to deploy.
@@ -272,24 +278,26 @@ class VLLMServer(LanguageModel):
                     print(f'[vLLM] Failed to load LoRA adapter. '
                           f'Status code: {response.status_code}, Response: {response.text}')
                 return True
-            except requests.exceptions.RequestException as e:
+            except requests.exceptions.RequestException:
                 continue
 
-        print(f'[vLLM] Error loading LoRA adapter: {str(e)}')
+        print(f'[vLLM] Error loading LoRA adapter.')
         return False
 
     def close(self):
         """Shut down vLLM server and kill all vLLM processes."""
         self._kill_vllm_process()
 
-    def chat_completion(self,
-                        message: str | List[openai.types.chat.ChatCompletionMessageParam],
-                        max_tokens: Optional[int] = None,
-                        timeout_seconds: Optional[int] = None,
-                        lora_name: Optional[str] = None,
-                        temperature: float = 0.9,
-                        top_p: float = 0.9,
-                        chat_template_kwargs: Optional[Dict[str, Any]] = None) -> str:
+    def chat_completion(
+            self,
+            message: str | List[openai.types.chat.ChatCompletionMessageParam],
+            max_tokens: Optional[int] = None,
+            timeout_seconds: Optional[int] = None,
+            lora_name: Optional[str] = None,
+            temperature: float = 0.9,
+            top_p: float = 0.9,
+            chat_template_kwargs: Optional[Dict[str, Any]] = None
+    ) -> str:
         """Send a chat completion query with OpenAI format to the vLLM server. Return the response content.
         Args:
             message: The message in str or openai format.
