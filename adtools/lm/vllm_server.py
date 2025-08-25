@@ -11,11 +11,6 @@ except ImportError:
     raise ImportError('Python package "vllm" is not installed.')
 
 try:
-    import openai.types.chat
-except ImportError:
-    raise ImportError('Python package "openai" is not installed.')
-
-try:
     import requests
 except ImportError:
     raise ImportError('Python package "requests" is not installed.')
@@ -27,6 +22,8 @@ import sys
 from pathlib import Path
 import psutil
 import time
+
+import openai.types.chat
 
 from .lm_base import LanguageModel
 
