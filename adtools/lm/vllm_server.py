@@ -15,6 +15,11 @@ try:
 except ImportError:
     raise ImportError('Python package "openai" is not installed.')
 
+try:
+    import requests
+except ImportError:
+    raise ImportError('Python package "requests" is not installed.')
+
 from typing import Optional, List, Literal, Dict, Any
 import os
 import subprocess
@@ -22,8 +27,6 @@ import sys
 from pathlib import Path
 import psutil
 import time
-
-import requests
 
 from .lm_base import LanguageModel
 
