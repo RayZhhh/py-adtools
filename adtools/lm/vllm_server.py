@@ -160,8 +160,8 @@ class VLLMServer(LanguageModel):
         env['CUDA_VISIBLE_DEVICES'] = gpus
         env['VLLM_LOGGING_LEVEL'] = self._vllm_log_level
 
-        # FIXME: These code are required for my machine :-(
-        # FIXME: This may due to the bad NCCL environment configuration :-(
+        # FIXME: These code are required for my machine :(
+        # FIXME: This may due to the bad NCCL configuration :(
         if isinstance(self._gpus, list) and len(self._gpus) > 1:
             # set NCCL environment variable
             env['NCCL_P2P_DISABLE'] = '1'
