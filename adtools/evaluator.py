@@ -8,9 +8,10 @@ Commercial use of this software or its derivatives requires prior written permis
 import multiprocessing
 import os
 import sys
+import time
 from abc import ABC, abstractmethod
 from queue import Empty
-from typing import Any, Literal, Dict, Callable, List
+from typing import Any, Literal, Dict, Callable, List, Tuple
 import psutil
 import traceback
 
@@ -151,8 +152,9 @@ class PyEvaluator(ABC):
             timeout_seconds: int | float = None,
             redirect_to_devnull: bool = False,
             multiprocessing_start_method: Literal['default', 'auto', 'fork', 'spawn'] = 'auto',
+            get_evaluate_time=False,
             **kwargs
-    ):
+    ) -> Any | Tuple[Any, float]:
         """Evaluate program in a new process. This enables timeout restriction and output redirection.
         Args:
             program: the program to be evaluated.
@@ -161,7 +163,11 @@ class PyEvaluator(ABC):
             multiprocessing_start_method: start a process using 'fork' or 'spawn'. If set to 'auto',
                 the process will be started using 'fork' with Linux/macOS and 'spawn' with Windows.
                 If set to 'default', there will be no changes to system default.
+            get_evaluate_time: get evaluation time for this program.
             **kwargs: additional keyword arguments to pass to 'evaluate_program'.
+        Returns:
+            Returns the evaluation results. If the 'get_evaluate_time' is True,
+            the return value will be (Results, Time).
         """
         if multiprocessing_start_method == 'auto':
             # Force macOS and Linux use 'fork' to generate new process
@@ -180,6 +186,7 @@ class PyEvaluator(ABC):
                 args=(str(program), result_queue, redirect_to_devnull),
                 kwargs=kwargs,
             )
+            evaluate_start_time = time.time()
             process.start()
 
             if timeout_seconds is not None:
@@ -205,7 +212,10 @@ class PyEvaluator(ABC):
                 result = result_queue.get()
                 # Terminate/kill all processes after evaluation
                 self._kill_process_and_its_children(process)
-            return result
+
+            # Calculate the evaluate time
+            eval_time = time.time() - evaluate_start_time
+            return (result, eval_time) if get_evaluate_time else result
         except Exception as e:
             if self.debug_mode:
                 print(traceback.format_exc())

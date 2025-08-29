@@ -75,7 +75,7 @@ def merge_sort(arr):
 '''
 
 if __name__ == '__main__':
-    evaluator = SortAlgorithmEvaluator()
+    evaluator = SortAlgorithmEvaluator(debug_mode=True)
 
     # Evaluate
     score = evaluator.evaluate(code_generated_by_llm)

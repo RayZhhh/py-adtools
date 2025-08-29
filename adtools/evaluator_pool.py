@@ -62,21 +62,23 @@ class EvaluatorExecutorPool:
             program: the program to be evaluated.
             timeout_seconds: return 'None' if the execution time exceeds 'timeout_seconds'.
             redirect_to_devnull: redirect any output to '/dev/null'.
-            multiprocessing_start_method: start a process using 'fork' or 'spawn'.
+            multiprocessing_start_method: start a process using 'fork' or 'spawn'. If set to 'auto',
+                the process will be started using 'fork' with Linux/macOS and 'spawn' with Windows.
+                If set to 'default', there will be no changes to system default.
+            return_time: get evaluation time for this program.
             **kwargs: additional keyword arguments to pass to 'evaluate_program'.
+        Returns:
+            Returns the evaluation results. If the 'get_evaluate_time' is True,
+            the return value will be (Results, Time).
         """
-        start_time = time.time()
         future = self.pool.submit(
             self.evaluator.secure_evaluate,
             program,
             timeout_seconds,
             redirect_to_devnull,
             multiprocessing_start_method,
+            return_time,
             **kwargs
         )
         res = future.result()
-        duration = time.time() - start_time
-        if return_time:
-            return res, duration
-        else:
-            return res
+        return res
