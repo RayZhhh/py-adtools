@@ -23,6 +23,7 @@ class PyEvaluator(ABC):
     def __init__(
             self,
             exec_code: bool = True,
+            find_and_kill_children_evaluation_process: bool = False,
             debug_mode: bool = False,
             *,
             join_timeout_seconds: int = 10
@@ -34,11 +35,15 @@ class PyEvaluator(ABC):
                 which will be passed to 'self.evaluate_program()'. Set this parameter to 'False' if you are going to
                 evaluate a Python scripy. Note that if the parameter is set to 'False', the arguments 'callable_...'
                 in 'self.evaluate_program()' will no longer be affective.
+            find_and_kill_children_evaluation_process: If using 'self.secure_evaluate', kill children processes
+                when they are terminated. Note that it is suggested to set to 'False' if the evaluation process
+                does not start new processes.
             debug_mode: Debug mode.
             join_timeout_seconds: Timeout in seconds to wait for the process to finish. Kill the process if timeout.
         """
         self.debug_mode = debug_mode
         self.exec_code = exec_code
+        self.find_and_kill_children_evaluation_process = find_and_kill_children_evaluation_process
         self.join_timeout_seconds = join_timeout_seconds
 
     @abstractmethod
@@ -67,11 +72,14 @@ class PyEvaluator(ABC):
         )
 
     def _kill_process_and_its_children(self, process: multiprocessing.Process):
-        # Find all children processes
-        try:
-            parent = psutil.Process(process.pid)
-            children_processes = parent.children(recursive=True)
-        except psutil.NoSuchProcess:
+        if self.find_and_kill_children_evaluation_process:
+            # Find all children processes
+            try:
+                parent = psutil.Process(process.pid)
+                children_processes = parent.children(recursive=True)
+            except psutil.NoSuchProcess:
+                children_processes = []
+        else:
             children_processes = []
         # Terminate parent process
         process.terminate()
