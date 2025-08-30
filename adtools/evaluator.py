@@ -193,15 +193,21 @@ class PyEvaluator(ABC):
                 try:
                     # Get the result in timeout seconds
                     result = result_queue.get(timeout=timeout_seconds)
+                    # Calculate the evaluate time
+                    eval_time = time.time() - evaluate_start_time
                     # After getting the result, terminate/kill the process
                     self._kill_process_and_its_children(process)
                 except Empty:  # The queue is empty indicates a timeout
+                    # Calculate the evaluate time
+                    eval_time = time.time() - evaluate_start_time
                     if self.debug_mode:
                         print(f'DEBUG: the evaluation time exceeds {timeout_seconds}s.')
                     # Terminate/kill all processes if timeout happens
                     self._kill_process_and_its_children(process)
                     result = None
                 except Exception as e:
+                    # Calculate the evaluate time
+                    eval_time = time.time() - evaluate_start_time
                     if self.debug_mode:
                         print(f'DEBUG: evaluation failed with exception:\n{traceback.format_exc()}')
                     # Terminate/kill all processes if meet exceptions
@@ -210,11 +216,11 @@ class PyEvaluator(ABC):
             else:
                 # If there is no timeout limit, wait execution to finish
                 result = result_queue.get()
+                # Calculate the evaluate time
+                eval_time = time.time() - evaluate_start_time
                 # Terminate/kill all processes after evaluation
                 self._kill_process_and_its_children(process)
 
-            # Calculate the evaluate time
-            eval_time = time.time() - evaluate_start_time
             return (result, eval_time) if get_evaluate_time else result
         except Exception as e:
             if self.debug_mode:
