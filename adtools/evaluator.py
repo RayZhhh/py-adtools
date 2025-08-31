@@ -7,9 +7,11 @@ Commercial use of this software or its derivatives requires prior written permis
 
 import multiprocessing
 import os
+import pickle
 import sys
 import time
 from abc import ABC, abstractmethod
+from multiprocessing import shared_memory
 from queue import Empty
 from typing import Any, Literal, Dict, Callable, List, Tuple
 import psutil
@@ -234,3 +236,167 @@ class PyEvaluator(ABC):
             if self.debug_mode:
                 print(traceback.format_exc())
             return None
+
+
+class PyEvaluatorForBigReturnedObjectV1(PyEvaluator):
+
+    def __init__(
+            self,
+            exec_code: bool = True,
+            find_and_kill_children_evaluation_process: bool = False,
+            debug_mode: bool = False,
+            *,
+            join_timeout_seconds: int = 10
+    ):
+        """Evaluator interface for evaluating the Python algorithm program. Override this class and implement
+        'evaluate_program' method, then invoke 'self.evaluate()' or 'self.secure_evaluate()' for evaluation.
+        Note: This class supports the secure_evaluate to handle very big return object, e.g., Tensors.
+
+        Args:
+            exec_code: Using 'exec()' to execute the program code and obtain the callable functions and classes,
+                which will be passed to 'self.evaluate_program()'. Set this parameter to 'False' if you are going to
+                evaluate a Python scripy. Note that if the parameter is set to 'False', the arguments 'callable_...'
+                in 'self.evaluate_program()' will no longer be affective.
+            find_and_kill_children_evaluation_process: If using 'self.secure_evaluate', kill children processes
+                when they are terminated. Note that it is suggested to set to 'False' if the evaluation process
+                does not start new processes.
+            debug_mode: Debug mode.
+            join_timeout_seconds: Timeout in seconds to wait for the process to finish. Kill the process if timeout.
+        """
+        super().__init__(
+            exec_code,
+            find_and_kill_children_evaluation_process,
+            debug_mode,
+            join_timeout_seconds=join_timeout_seconds
+        )
+
+    @abstractmethod
+    def evaluate_program(
+            self,
+            program_str: str,
+            callable_functions_dict: Dict[str, Callable] | None,
+            callable_functions_list: List[Callable] | None,
+            callable_classes_dict: Dict[str, Callable] | None,
+            callable_classes_list: List[Callable] | None,
+            **kwargs
+    ) -> Any:
+        """Evaluate a given program.
+        Args:
+            program_str: The raw program text.
+            callable_functions_dict: A dict maps function name to callable function.
+            callable_functions_list: A list of callable functions.
+            callable_classes_dict: A dict maps class name to callable class.
+            callable_classes_list: A list of callable classes.
+        Returns:
+            Returns the evaluation result.
+        """
+        raise NotImplementedError(
+            'Must provide an evaluator for a python program. '
+            'Override this method in a subclass.'
+        )
+
+    def _evaluate_in_shared_memory(
+            self,
+            program_str: str,
+            meta_queue: multiprocessing.Queue,
+            redirect_to_devnull: bool,
+            **kwargs
+    ):
+        """Evaluate and store result in shared memory (for large results)."""
+        # Redirect STDOUT and STDERR to '/dev/null'
+        if redirect_to_devnull:
+            with open(os.devnull, 'w') as devnull:
+                os.dup2(devnull.fileno(), sys.stdout.fileno())
+                os.dup2(devnull.fileno(), sys.stderr.fileno())
+
+        # Evaluate and get results
+        res = self.evaluate(program_str, **kwargs)
+
+        try:
+            # Dump the results to data
+            data = pickle.dumps(res, protocol=pickle.HIGHEST_PROTOCOL)
+            # Create shared memory with the size of data
+            shm = shared_memory.SharedMemory(create=True, size=len(data))
+            # Write data
+            shm.buf[:len(data)] = data
+            # Send back shm metadata (shared_mem_name, shared_mem_size) and put them into the queue
+            meta_queue.put((shm.name, len(data)))
+            # Child closes its handle
+            shm.close()
+        except Exception as data_pickle_error:
+            # Put the exception message to the queue
+            meta_queue.put((None, str(data_pickle_error)))
+
+    def secure_evaluate(
+            self,
+            program: str | PyProgram,
+            timeout_seconds: int | float = None,
+            redirect_to_devnull: bool = False,
+            multiprocessing_start_method: str = 'auto',
+            get_evaluate_time: bool = False,
+            **kwargs
+    ):
+        if multiprocessing_start_method == 'auto':
+            if sys.platform.startswith('darwin') or sys.platform.startswith('linux'):
+                multiprocessing.set_start_method('fork', force=True)
+        elif multiprocessing_start_method == 'fork':
+            multiprocessing.set_start_method('fork', force=True)
+        elif multiprocessing_start_method == 'spawn':
+            multiprocessing.set_start_method('spawn', force=True)
+
+        meta_queue = multiprocessing.Queue()
+
+        process = multiprocessing.Process(
+            target=self._evaluate_in_shared_memory,
+            args=(str(program), meta_queue, redirect_to_devnull),
+            kwargs=kwargs,
+        )
+
+        evaluate_start_time = time.time()
+        process.start()
+
+        try:
+            if timeout_seconds is not None:
+                try:
+                    # Try to get the metadata before timeout
+                    meta = meta_queue.get(timeout=timeout_seconds)
+                except Empty:
+                    # Evaluate timeout
+                    eval_time = time.time() - evaluate_start_time
+                    if self.debug_mode:
+                        print(f'DEBUG: evaluation time exceeds {timeout_seconds}s.')
+                    self._kill_process_and_its_children(process)
+                    return (None, eval_time) if get_evaluate_time else None
+            else:
+                meta = meta_queue.get()
+
+            # Calculate evaluation time
+            eval_time = time.time() - evaluate_start_time
+            self._kill_process_and_its_children(process)
+
+            # If the first element in the queue is None,
+            # it means that the shared memory raises exceptions
+            if meta[0] is None:
+                if self.debug_mode:
+                    print(f'DEBUG: shared memory failed with exception: {meta[1]}')
+                result = None
+            else:
+                # Read results from metadata
+                shm_name, size = meta
+                shm = shared_memory.SharedMemory(name=shm_name)
+                buf = bytes(shm.buf[:size])
+                # Load results from buffer
+                result = pickle.loads(buf)
+                shm.close()
+                try:
+                    shm.unlink()
+                except FileNotFoundError:
+                    pass
+        except Exception:
+            eval_time = time.time() - evaluate_start_time
+            if self.debug_mode:
+                print(f'DEBUG: exception in shared evaluate:\n{traceback.format_exc()}')
+            self._kill_process_and_its_children(process)
+            result = None
+
+        return (result, eval_time) if get_evaluate_time else result
