@@ -23,6 +23,17 @@ from .py_code import PyProgram
 __all__ = ['PyEvaluator', 'PyEvaluatorForBigReturnedObject']
 
 
+def _set_mp_start_method(multiprocessing_start_method: Literal['default', 'auto', 'fork', 'spawn']):
+    if multiprocessing_start_method == 'auto':
+        # Force macOS and Linux use 'fork' to generate new process
+        if sys.platform.startswith('darwin') or sys.platform.startswith('linux'):
+            multiprocessing.set_start_method('fork', force=True)
+    elif multiprocessing_start_method == 'fork':
+        multiprocessing.set_start_method('fork', force=True)
+    elif multiprocessing_start_method == 'spawn':
+        multiprocessing.set_start_method('spawn', force=True)
+
+
 class PyEvaluator(ABC):
 
     def __init__(
@@ -104,43 +115,38 @@ class PyEvaluator(ABC):
             program: the program to be evaluated.
             **kwargs: additional keyword arguments to pass to 'evaluate_program'.
         """
-        try:
-            # Parse to program instance
-            if isinstance(program, str):
-                program = PyProgram.from_text(program)
-            function_names = [f.name for f in program.functions]
-            class_names = [c.name for c in program.classes]
+        # Parse to program instance
+        if isinstance(program, str):
+            program = PyProgram.from_text(program)
+        function_names = [f.name for f in program.functions]
+        class_names = [c.name for c in program.classes]
 
-            # Execute the code and get callable instances
-            if self.exec_code:
-                all_globals_namespace = {}
-                # Execute the program, map func/var/class to global namespace
-                exec(str(program), all_globals_namespace)
-                # Get callable functions
-                callable_funcs_list = [all_globals_namespace[f_name] for f_name in function_names]
-                callable_funcs_dict = dict(zip(function_names, callable_funcs_list))
-                # Get callable classes
-                callable_cls_list = [all_globals_namespace[c_name] for c_name in class_names]
-                callable_cls_dict = dict(zip(class_names, callable_cls_list))
-            else:
-                callable_funcs_list, callable_funcs_dict, callable_cls_list, callable_cls_dict = (
-                    None, None, None, None
-                )
-
-            # Get evaluate result
-            res = self.evaluate_program(
-                str(program),
-                callable_funcs_dict,
-                callable_funcs_list,
-                callable_cls_dict,
-                callable_cls_list,
-                **kwargs
+        # Execute the code and get callable instances
+        if self.exec_code:
+            all_globals_namespace = {}
+            # Execute the program, map func/var/class to global namespace
+            exec(str(program), all_globals_namespace)
+            # Get callable functions
+            callable_funcs_list = [all_globals_namespace[f_name] for f_name in function_names]
+            callable_funcs_dict = dict(zip(function_names, callable_funcs_list))
+            # Get callable classes
+            callable_cls_list = [all_globals_namespace[c_name] for c_name in class_names]
+            callable_cls_dict = dict(zip(class_names, callable_cls_list))
+        else:
+            callable_funcs_list, callable_funcs_dict, callable_cls_list, callable_cls_dict = (
+                None, None, None, None
             )
-            return res
-        except Exception as e:
-            if self.debug_mode:
-                print(traceback.format_exc())
-            return None
+
+        # Get evaluate result
+        res = self.evaluate_program(
+            str(program),
+            callable_funcs_dict,
+            callable_funcs_list,
+            callable_cls_dict,
+            callable_cls_list,
+            **kwargs
+        )
+        return res
 
     def _evaluate_in_safe_process(
             self,
@@ -182,14 +188,7 @@ class PyEvaluator(ABC):
             Returns the evaluation results. If the 'get_evaluate_time' is True,
             the return value will be (Results, Time).
         """
-        if multiprocessing_start_method == 'auto':
-            # Force macOS and Linux use 'fork' to generate new process
-            if sys.platform.startswith('darwin') or sys.platform.startswith('linux'):
-                multiprocessing.set_start_method('fork', force=True)
-        elif multiprocessing_start_method == 'fork':
-            multiprocessing.set_start_method('fork', force=True)
-        elif multiprocessing_start_method == 'spawn':
-            multiprocessing.set_start_method('spawn', force=True)
+        _set_mp_start_method(multiprocessing_start_method)
 
         try:
             # Start evaluation process
@@ -237,7 +236,7 @@ class PyEvaluator(ABC):
             return (result, eval_time) if get_evaluate_time else result
         except Exception as e:
             if self.debug_mode:
-                print(traceback.format_exc())
+                traceback.print_exc()
             return None
 
 
@@ -310,7 +309,7 @@ class PyEvaluatorForBigReturnedObject(PyEvaluator):
             signal_queue.put(('ok', None))
         except Exception as e:
             if self.debug_mode:
-                print(traceback.format_exc())
+                traceback.print_exc()
             # Write results into dict
             result_dict['result'] = None
             # Put a signal to queue to inform the parent process the evaluation has terminated
@@ -321,7 +320,7 @@ class PyEvaluatorForBigReturnedObject(PyEvaluator):
             program: str | PyProgram,
             timeout_seconds: int | float = None,
             redirect_to_devnull: bool = False,
-            multiprocessing_start_method: str = 'auto',
+            multiprocessing_start_method: Literal['default', 'auto', 'fork', 'spawn'] = 'auto',
             get_evaluate_time: bool = False,
             **kwargs
     ):
@@ -339,14 +338,7 @@ class PyEvaluatorForBigReturnedObject(PyEvaluator):
             Returns the evaluation results. If the 'get_evaluate_time' is True,
             the return value will be (Results, Time).
         """
-        if multiprocessing_start_method == 'auto':
-            # Force macOS and Linux use 'fork' to generate new process
-            if sys.platform.startswith('darwin') or sys.platform.startswith('linux'):
-                multiprocessing.set_start_method('fork', force=True)
-        elif multiprocessing_start_method == 'fork':
-            multiprocessing.set_start_method('fork', force=True)
-        elif multiprocessing_start_method == 'spawn':
-            multiprocessing.set_start_method('spawn', force=True)
+        _set_mp_start_method(multiprocessing_start_method)
 
         with multiprocessing.Manager() as manager:
             # Path a dictionary to the evaluation process to get maybe very big return objects
