@@ -6,7 +6,7 @@ Commercial use of this software or its derivatives requires prior written permis
 """
 
 import os
-from typing import List
+from typing import List, Optional
 
 import openai.types.chat
 
@@ -46,8 +46,8 @@ class OpenAIAPI(LanguageModel):
     def chat_completion(
             self,
             message: str | List[openai.types.chat.ChatCompletionMessageParam],
-            max_tokens: int,
-            timeout_seconds: float,
+            max_tokens: Optional[int] = None,
+            timeout_seconds: Optional[float] = None,
             *args,
             **kwargs
     ):

@@ -75,6 +75,7 @@ class VLLMServer(LanguageModel):
             env_variable_dict: Environment variables to use for vLLM server, e.g., {'KEY': 'VALUE'}.
             vllm_serve_args: Arguments to pass to vLLM server, e.g., ['--enable-reasoning'].
             vllm_serve_kwargs: Keyword arguments to pass to vLLM server, e.g., {'--reasoning-parser': 'deepseek-r1'}.
+            chat_template_kwargs: Keyword arguments to pass to chat template, e.g., {'enable_thinking': False}.
 
         Example:
             # deploy a model on GPU 0 and 1

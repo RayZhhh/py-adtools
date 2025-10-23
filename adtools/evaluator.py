@@ -160,10 +160,13 @@ class PyEvaluator(ABC):
             with open(os.devnull, 'w') as devnull:
                 os.dup2(devnull.fileno(), sys.stdout.fileno())
                 os.dup2(devnull.fileno(), sys.stderr.fileno())
-
-        # Evaluate and put the results to the queue
-        res = self.evaluate(program_str, **kwargs)
-        result_queue.put(res)
+        try:
+            # Evaluate and put the results to the queue
+            res = self.evaluate(program_str, **kwargs)
+            result_queue.put(res)
+        except:
+            traceback.print_exc()
+            result_queue.put(None)
 
     def secure_evaluate(
             self,

@@ -163,11 +163,14 @@ class PyProgram:
         return program
 
     @classmethod
-    def from_text(cls, text: str) -> 'PyProgram':
-        tree = ast.parse(text)
-        visitor = _ProgramVisitor(text)
-        visitor.visit(tree)
-        return visitor.return_program()
+    def from_text(cls, text: str) -> Optional['PyProgram']:
+        try:
+            tree = ast.parse(text)
+            visitor = _ProgramVisitor(text)
+            visitor.visit(tree)
+            return visitor.return_program()
+        except:
+            return None
 
 
 class _ProgramVisitor(ast.NodeVisitor):
