@@ -289,6 +289,10 @@ class VLLMServer(LanguageModel):
         """Shut down vLLM server and kill all vLLM processes."""
         self._kill_vllm_process()
 
+    def reload(self):
+        self._process = self._launch_vllm()
+        self._wait_for_vllm()
+
     def chat_completion(
             self,
             message: str | List[openai.types.chat.ChatCompletionMessageParam],

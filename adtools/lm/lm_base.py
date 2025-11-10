@@ -35,5 +35,9 @@ class LanguageModel:
         """Release resources (if necessary)."""
         pass
 
+    def reload(self):
+        """Reload the language model (if necessary)."""
+        pass
+
     def __del__(self):
         self.close()

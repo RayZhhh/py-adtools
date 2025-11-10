@@ -20,7 +20,7 @@ import traceback
 
 from .py_code import PyProgram
 
-__all__ = ['PyEvaluator', 'PyEvaluatorForBigReturnedObject']
+__all__ = ['PyEvaluator', 'PyEvaluatorForLargeReturnObject']
 
 
 def _set_mp_start_method(multiprocessing_start_method: Literal['default', 'auto', 'fork', 'spawn']):
@@ -243,7 +243,7 @@ class PyEvaluator(ABC):
             return None
 
 
-class PyEvaluatorForBigReturnedObject(PyEvaluator):
+class PyEvaluatorForLargeReturnObject(PyEvaluator):
     def __init__(
             self,
             exec_code: bool = True,
@@ -400,7 +400,7 @@ class PyEvaluatorForBigReturnedObject(PyEvaluator):
         return (result, eval_time) if get_evaluate_time else result
 
 
-class PyEvaluatorForBigReturnedObjectV2(PyEvaluator):
+class PyEvaluatorForLargeReturnObjectV2(PyEvaluator):
 
     def __init__(
             self,
