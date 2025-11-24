@@ -8,14 +8,15 @@ Commercial use of this software or its derivatives requires prior written permis
 import ast
 import dataclasses
 import textwrap
-from typing import List, Optional
+from typing import List, Optional, Union
 
 __all__ = ['PyCodeBlock', 'PyFunction', 'PyClass', 'PyProgram']
 
 
 @dataclasses.dataclass
 class PyCodeBlock:
-    """A parsed Python code block (e.g., top-level code that's not in classes/functions).
+    """A parsed Python code block (e.g., top-level code that is not in classes/functions,
+    or miscellaneous statements inside a class).
     """
     code: str
 
@@ -36,30 +37,34 @@ class PyFunction:
     name: str
     args: str
     body: str
-    return_type: str | None = None
-    docstring: str | None = None
+    return_type: Optional[str] = None
+    docstring: Optional[str] = None
+    is_async: bool = False
 
     def __str__(self) -> str:
         return_type = f' -> {self.return_type}' if self.return_type else ''
-        function = f'{self.decorator}\n' if self.decorator else ''
-        function += f'def {self.name}({self.args}){return_type}:\n'
+        function_def = f'{self.decorator}\n' if self.decorator else ''
+        prefix = 'async def' if self.is_async else 'def'
+        function_def += f'{prefix} {self.name}({self.args}){return_type}:\n'
+
         if self.docstring:
-            # The self.docstring is already indented on every line except the first one.
-            # Here, we assume the indentation is always 4 spaces.
+            # We indent the docstring. Assumes 4-space standard indentation for generation.
             new_line = '\n' if self.body else ''
-            function += f'    """{self.docstring}"""{new_line}'
-        # The self.body is already indented.
-        function += self.body
-        return function
+            function_def += f'    """{self.docstring}"""{new_line}'
+
+        # The body is expected to be already indented (if parsed correctly).
+        # We ensure it is indented relative to the function definition.
+        function_def += textwrap.indent(self.body, '    ')
+        return function_def
 
     def __repr__(self) -> str:
         return self.__str__() + '\n\n'
 
     def __setattr__(self, name: str, value: str) -> None:
         # Ensure there aren't leading & trailing new lines in `body`
-        if name == 'body':
+        if name == 'body' and isinstance(value, str):
             value = value.strip('\n')
-        # ensure there aren't leading & trailing quotes in `docstring`
+        # Ensure there aren't leading & trailing quotes in `docstring`
         if name == 'docstring' and value is not None:
             if '"""' in value:
                 value = value.strip()
@@ -68,14 +73,18 @@ class PyFunction:
 
     @classmethod
     def extract_first_function_from_text(cls, text: str) -> 'PyFunction':
+        """Parses text and returns the first function found."""
         tree = ast.parse(text)
         visitor = _ProgramVisitor(text)
         visitor.visit(tree)
         program = visitor.return_program()
+        if not program.functions:
+            raise ValueError('No functions found in the provided text.')
         return program.functions[0]
 
     @classmethod
     def extract_all_functions_from_text(cls, text: str) -> List['PyFunction']:
+        """Parses text and returns all top-level functions found."""
         tree = ast.parse(text)
         visitor = _ProgramVisitor(text)
         visitor.visit(tree)
@@ -89,10 +98,13 @@ class PyClass:
     decorator: str
     name: str
     bases: str
-    class_vars_and_code: List[PyCodeBlock] = None
-    docstring: str | None = None
-    functions: list[PyFunction] = dataclasses.field(default_factory=list)
-    functions_class_vars_and_code: List[PyCodeBlock | PyFunction] | None = None
+
+    # Holds raw code blocks (variables, assignments) found in the class body.
+    statements: Optional[List[PyCodeBlock]] = None
+    docstring: Optional[str] = None
+    functions: List[PyFunction] = dataclasses.field(default_factory=list)
+    # Holds everything in order (Methods + Statements + Gaps).
+    body: Optional[List[Union[PyCodeBlock, PyFunction]]] = None
 
     def __str__(self) -> str:
         class_def = f'{self.decorator}\n' if self.decorator else ''
@@ -104,26 +116,28 @@ class PyClass:
         if self.docstring:
             class_def += f'    """{self.docstring}"""\n'
 
-        for i, item in enumerate(self.functions_class_vars_and_code):
-            if isinstance(item, PyCodeBlock):
-                # The PyCodeBlock has already indented
-                class_def += f'{str(item)}'
-            else:
-                # Add functions with an extra level of indentation
-                class_def += textwrap.indent(str(item).strip(), '    ')
-            # Add '\n\n' if this is not the last element
-            if i != len(self.functions_class_vars_and_code) - 1:
-                class_def += '\n\n'
+        if self.body:
+            last_item = None
+            for i, item in enumerate(self.body):
+                if last_item is not None:
+                    # If there are not two consecutive PyCodeBlock intances, we add an addtional new line
+                    if not (isinstance(last_item, PyCodeBlock) and isinstance(item, PyCodeBlock)):
+                        class_def += '\n'
+                # Indent everything inside the class by 4 spaces
+                class_def += textwrap.indent(str(item), '    ')
+                class_def += '\n' if i != len(self.body) - 1 else ''
+                last_item = item
+        else:
+            class_def += '    pass'
+
         return class_def
 
     def __repr__(self):
         return self.__str__() + '\n\n'
 
     def __setattr__(self, name: str, value: str) -> None:
-        # Ensure there aren't leading & trailing new lines in `body`
-        if name == 'body':
+        if name == 'body' and isinstance(value, str):
             value = value.strip('\n')
-        # Ensure there aren't leading & trailing quotes in `docstring`
         if name == 'docstring' and value is not None:
             if '"""' in value:
                 value = value.strip()
@@ -136,6 +150,8 @@ class PyClass:
         visitor = _ProgramVisitor(text)
         visitor.visit(tree)
         program = visitor.return_program()
+        if not program.classes:
+            raise ValueError('No classes found in the provided text.')
         return program.classes[0]
 
     @classmethod
@@ -149,212 +165,214 @@ class PyClass:
 
 @dataclasses.dataclass
 class PyProgram:
-    """A parsed Python program."""
+    """A parsed Python program containing scripts, functions, and classes."""
 
-    scripts: list[PyCodeBlock]  # Top-level code that's not in classes/functions
-    functions: list[PyFunction]  # Top-level functions in the code
-    classes: list[PyClass]  # Top-level classes in the code
-    classes_functions_scripts: list[PyFunction | PyClass | PyCodeBlock]
+    scripts: List[PyCodeBlock]  # Top-level code not in classes/functions
+    functions: List[PyFunction]  # Top-level functions
+    classes: List[PyClass]  # Top-level classes
+    # Complete sequence of the file elements.
+    elements: List[Union[PyFunction, PyClass, PyCodeBlock]]
 
     def __str__(self) -> str:
         program = ''
-        for class_or_func_or_script in self.classes_functions_scripts:
-            program += str(class_or_func_or_script) + '\n\n'
-        return program
+        for item in self.elements:
+            program += str(item) + '\n\n'
+        return program.strip()
 
     @classmethod
     def from_text(cls, text: str) -> Optional['PyProgram']:
+        """Parses text into a PyProgram object. Returns None on syntax errors."""
         try:
             tree = ast.parse(text)
             visitor = _ProgramVisitor(text)
             visitor.visit(tree)
             return visitor.return_program()
-        except:
+        except SyntaxError:
+            return None
+        except Exception as e:
+            print(f'Error parsing program: {e}')
             return None
 
 
 class _ProgramVisitor(ast.NodeVisitor):
-    """Parses code to collect all required information to produce a `Program`.
-    Now handles scripts, functions, and classes.
+    """Parses code to collect all required information to produce a `PyProgram`.
+    Handles scripts, functions, and classes with robust indentation handling.
     """
 
     def __init__(self, sourcecode: str):
-        self._codelines: list[str] = sourcecode.splitlines()
-        self._scripts: list[PyCodeBlock] = []
-        self._functions: list[PyFunction] = []
-        self._classes: list[PyClass] = []
-        self._classes_functions_scripts: list[PyFunction | PyClass | PyCodeBlock] = []
+        self._codelines: List[str] = sourcecode.splitlines()
+
+        self._scripts: List[PyCodeBlock] = []
+        self._functions: List[PyFunction] = []
+        self._classes: List[PyClass] = []
+        self._elements: List[Union[PyFunction, PyClass, PyCodeBlock]] = []
         self._last_script_end = 0
 
-    def _get_code(self, start_line: int, end_line: int, dedent=False):
-        """Get code between start_line and end_line in 'self._codelines'.
-        """
-        code = []
-        for line in self._codelines[start_line: end_line]:
-            if dedent:
-                code.append(line[4:])
-            else:
-                code.append(line)
-        return '\n'.join(code).rstrip()
+    def _get_code(self, start_line: int, end_line: int, dedent: bool = False) -> str:
+        """Get code between start_line and end_line."""
+        if start_line >= end_line:
+            return ''
 
-    def _add_script(self, start_line: int, end_line: int):
-        """Add a script segment from the code.
-        """
+        lines = self._codelines[start_line: end_line]
+        code = '\n'.join(lines)
+
+        if dedent:
+            return textwrap.dedent(code).rstrip()
+        else:
+            return code.rstrip()
+
+    def _add_script_segment(self, start_line: int, end_line: int):
+        """Add a script segment (gap between functions/classes) from the code."""
         if start_line >= end_line:
             return
         script_code = self._get_code(start_line, end_line).strip()
         if script_code:
             script = PyCodeBlock(code=script_code)
             self._scripts.append(script)
-            self._classes_functions_scripts.append(script)
+            self._elements.append(script)
+
+    def _extract_function_info(self, node: Union[ast.FunctionDef, ast.AsyncFunctionDef]) -> PyFunction:
+        """Shared logic to extract information from FunctionDef or AsyncFunctionDef."""
+        # Extract decorators
+        if hasattr(node, 'decorator_list') and node.decorator_list:
+            dec_start = min(d.lineno for d in node.decorator_list)
+            decorator = self._get_code(dec_start - 1, node.lineno - 1, dedent=True)
+        else:
+            decorator = None
+
+        # Extract docstring safely
+        docstring = ast.get_docstring(node)
+
+        # Determine where the actual code body starts
+        body_start_line_node = node.body[0]
+        if docstring and len(node.body) > 1:
+            body_start_line = node.body[1].lineno - 1
+        elif docstring:
+            body_start_line = node.end_lineno
+        else:
+            body_start_line = node.body[0].lineno - 1
+
+        # Extract body
+        body = self._get_code(body_start_line, node.end_lineno, dedent=True)
+        is_async = isinstance(node, ast.AsyncFunctionDef)
+
+        return PyFunction(
+            decorator=decorator,
+            name=node.name,
+            args=ast.unparse(node.args),
+            return_type=ast.unparse(node.returns) if node.returns else None,
+            docstring=docstring,
+            body=body,
+            is_async=is_async
+        )
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        """Collects all information about the function being parsed.
-        """
-        # We only consider top-level function
+        """Handles top-level synchronous functions."""
         if node.col_offset == 0:
-            # Extract decorator first
-            has_decorators = bool(node.decorator_list)
-            if has_decorators:
-                # Find the minimum line number and retain the code above
-                decorator_start_line = min(decorator.lineno for decorator in node.decorator_list)
-                decorator = self._get_code(decorator_start_line - 1, node.lineno - 1)
-                # Update script end line
-                script_end_line = decorator_start_line - 1
-            else:
-                decorator = None
-                script_end_line = node.lineno - 1
+            start_line = node.lineno - 1
+            if hasattr(node, 'decorator_list') and node.decorator_list:
+                start_line = min(d.lineno for d in node.decorator_list) - 1
 
-            # Add any script code before this function
-            self._add_script(self._last_script_end, script_end_line)
+            self._add_script_segment(self._last_script_end, start_line)
             self._last_script_end = node.end_lineno
 
-            function_end_line = node.end_lineno
-            body_start_line = node.body[0].lineno - 1
-            docstring = None
-
-            # If the first node is ast.Expr, we regard it as a docstring
-            if isinstance(node.body[0], ast.Expr) and isinstance(node.body[0].value, ast.Constant):
-                docstring = ast.literal_eval(ast.unparse(node.body[0])).strip()
-                if len(node.body) > 1:
-                    body_start_line = node.body[0].end_lineno
-                else:
-                    body_start_line = function_end_line
-
-            # Return a PyFunction instance
-            func = PyFunction(
-                decorator=decorator,
-                name=node.name,
-                args=ast.unparse(node.args),
-                return_type=ast.unparse(node.returns) if node.returns else None,
-                docstring=docstring,
-                body=self._get_code(body_start_line, function_end_line)
-            )
-
+            func = self._extract_function_info(node)
             self._functions.append(func)
-            self._classes_functions_scripts.append(func)
-        self.generic_visit(node)
+            self._elements.append(func)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        """Handles top-level asynchronous functions."""
+        if node.col_offset == 0:
+            start_line = node.lineno - 1
+            if hasattr(node, 'decorator_list') and node.decorator_list:
+                start_line = min(d.lineno for d in node.decorator_list) - 1
+
+            self._add_script_segment(self._last_script_end, start_line)
+            self._last_script_end = node.end_lineno
+
+            func = self._extract_function_info(node)
+            self._functions.append(func)
+            self._elements.append(func)
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
-        """Collects all information about the class being parsed.
-        """
-        # We only care about top-level classes
+        """Handles top-level classes."""
         if node.col_offset == 0:
-            # Extract decorator first
-            has_decorators = bool(node.decorator_list)
-            if has_decorators:
-                # Find the minimum line number and retain the code above
-                decorator_start_line = min(decorator.lineno for decorator in node.decorator_list)
-                class_decorator = self._get_code(decorator_start_line - 1, node.lineno - 1)
-                # Update script end line
-                script_end_line = decorator_start_line - 1
+            # Handle decorators and preceding script
+            start_line = node.lineno - 1
+            if hasattr(node, 'decorator_list') and node.decorator_list:
+                start_line = min(d.lineno for d in node.decorator_list) - 1
+                decorator_code = self._get_code(start_line, node.lineno - 1)
             else:
-                class_decorator = None
-                script_end_line = node.lineno - 1
+                decorator_code = None
 
-            # Add any script code before this class
-            self._add_script(self._last_script_end, script_end_line)
+            self._add_script_segment(self._last_script_end, start_line)
             self._last_script_end = node.end_lineno
 
-            # Extract class docstring
-            docstring = None
-            if isinstance(node.body[0], ast.Expr) and isinstance(node.body[0].value, ast.Constant):
-                docstring = ast.literal_eval(ast.unparse(node.body[0]))
-
-            # Record methods
-            methods = []
-            # Record class variables or code that are not methods
-            class_vars_and_code = []
-            # Record the order of function and class vars and code
-            function_class_vars_and_code = []
-
-            # Traverse each body, if there is a docstring, skip body[0]
-            for item in node.body if docstring is None else node.body[1:]:
-                if isinstance(item, ast.FunctionDef):
-                    # Extract decorators
-                    has_decorators = bool(item.decorator_list)
-                    if has_decorators:
-                        # Find the minimum line number and retain the code above
-                        decorator_start_line = min(decorator.lineno for decorator in item.decorator_list)
-                        # Dedent decorator code
-                        decorator = self._get_code(decorator_start_line - 1, item.lineno - 1, dedent=True)
-                    else:
-                        decorator = None
-
-                    method_end_line = item.end_lineno
-                    method_body_start_line = item.body[0].lineno - 1
-                    method_docstring = None
-
-                    # Extract doc-string if there exists
-                    if isinstance(item.body[0], ast.Expr) and isinstance(item.body[0].value, ast.Constant):
-                        method_docstring = ast.literal_eval(ast.unparse(item.body[0])).strip()
-                        if len(item.body) > 1:
-                            method_body_start_line = item.body[0].end_lineno
-                        else:
-                            method_body_start_line = method_end_line
-
-                    # Extract function body and dedent for 4 spaces
-                    body = self._get_code(method_body_start_line, method_end_line, dedent=True)
-
-                    py_func = PyFunction(
-                        decorator=decorator,
-                        name=item.name,
-                        args=ast.unparse(item.args),
-                        return_type=ast.unparse(item.returns) if item.returns else None,
-                        docstring=method_docstring,
-                        body=body,
-                    )
-                    methods.append(py_func)
-                    function_class_vars_and_code.append(py_func)
-                else:  # If the item is not a function definition, add to class variables and code
-                    code = self._get_code(item.lineno - 1, item.end_lineno)
-                    py_script = PyCodeBlock(code=code)
-                    class_vars_and_code.append(py_script)
-                    function_class_vars_and_code.append(py_script)
-
-            # Get base classes
+            # Extract class basic info
+            docstring = ast.get_docstring(node)
             bases = ', '.join([ast.unparse(base) for base in node.bases]) if node.bases else None
 
-            # Return a PyClass instance
-            class_ = PyClass(
-                decorator=class_decorator,
+            # Process class body contents
+            methods = []
+            statements = []
+            class_body = []
+            last_inner_end = node.lineno
+            body_nodes = node.body
+
+            if docstring:
+                if len(body_nodes) > 0:
+                    last_inner_end = body_nodes[0].end_lineno
+                body_nodes = body_nodes[1:]
+
+            for item in body_nodes:
+                # Default start is the definition line
+                item_start_line = item.lineno
+
+                # If the item has decorators (Function or Class), the visual start is the first decorator
+                if hasattr(item, 'decorator_list') and item.decorator_list:
+                    item_start_line = min(d.lineno for d in item.decorator_list)
+
+                # Capture Gaps (Use item_start_line instead of item.lineno)
+                gap_code = self._get_code(last_inner_end, item_start_line - 1, dedent=True).strip()
+                if gap_code:
+                    gap_block = PyCodeBlock(code=gap_code)
+                    statements.append(gap_block)
+                    class_body.append(gap_block)
+
+                # Process the Item
+                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    method_func = self._extract_function_info(item)
+                    methods.append(method_func)
+                    class_body.append(method_func)
+                else:
+                    code_text = self._get_code(item.lineno - 1, item.end_lineno, dedent=True)
+                    block = PyCodeBlock(code=code_text)
+                    statements.append(block)
+                    class_body.append(block)
+
+                last_inner_end = item.end_lineno
+
+            class_obj = PyClass(
+                decorator=decorator_code,
                 name=node.name,
                 bases=bases,
                 docstring=docstring,
-                class_vars_and_code=class_vars_and_code if class_vars_and_code else None,
+                statements=statements if statements else None,
                 functions=methods,
-                functions_class_vars_and_code=function_class_vars_and_code if function_class_vars_and_code else None
+                body=class_body if class_body else None
             )
-            self._classes.append(class_)
-            self._classes_functions_scripts.append(class_)
+            self._classes.append(class_obj)
+            self._elements.append(class_obj)
+
         self.generic_visit(node)
 
     def return_program(self) -> PyProgram:
-        # Add any remaining script code after the last class/function
-        self._add_script(self._last_script_end, len(self._codelines))
+        """Finalizes parsing and returns the PyProgram object."""
+        self._add_script_segment(self._last_script_end, len(self._codelines))
+
         return PyProgram(
             scripts=self._scripts,
             functions=self._functions,
             classes=self._classes,
-            classes_functions_scripts=self._classes_functions_scripts,
+            elements=self._elements,
         )
