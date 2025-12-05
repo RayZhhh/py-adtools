@@ -6,13 +6,13 @@ Commercial use of this software or its derivatives requires prior written permis
 """
 
 # -------------------------------------------------------------------------------------------------
-# This file provides three different kinds of evaluators:
+# - This file provides three different kinds of evaluators:
 #     (1) PyEvaluator
 #     (2) PyEvaluatorReturnInManagerDict
 #     (3) PyEvaluatorReturnInSharedMemory
-# All evaluators must implement the 'evaluate_program' method.
-# If the implementation of 'evaluate_program' returns a large object, e.g., a big tensor,
-# the 'PyEvaluatorReturnInSharedMemory' should be a better choice.
+# - All evaluators must implement the 'evaluate_program' method.
+# - If the implementation of 'evaluate_program' returns a large object, e.g., a big tensor,
+#   the 'PyEvaluatorReturnInSharedMemory' should be a better choice.
 # -------------------------------------------------------------------------------------------------
 
 
