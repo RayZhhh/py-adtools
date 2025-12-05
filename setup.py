@@ -5,7 +5,7 @@ with open('README.md', 'r', encoding='utf-8') as fh:
 
 setup(
     name='py-adtools',
-    version='0.1.10',
+    version='0.1.11',
     author='Rui Zhang',
     author_email='rzhang.cs@gmail.com',
     description='Useful tools for parsing and evaluating Python programs for LLM-based algorithm design.',

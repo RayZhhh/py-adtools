@@ -5,11 +5,21 @@ NOTICE: This code is under MIT license. This code is intended for academic/resea
 Commercial use of this software or its derivatives requires prior written permission.
 """
 
+# This file provides three different kinds of evaluators:
+#     (1) PyEvaluator
+#     (2) PyEvaluatorReturnInManagerDict
+#     (3) PyEvaluatorReturnInSharedMemory
+# All evaluators must implement the 'evaluate_program' method.
+# If the implementation of 'evaluate_program' returns a large object, e.g., a big tensor,
+# the 'PyEvaluatorReturnInSharedMemory' should be a better choice.
+
+
 import multiprocessing
 import os
 import pickle
 import sys
 import time
+import uuid
 from abc import ABC, abstractmethod
 from multiprocessing import shared_memory
 from queue import Empty
@@ -20,7 +30,11 @@ import traceback
 
 from .py_code import PyProgram
 
-__all__ = ['PyEvaluator', 'PyEvaluatorForLargeReturnObject']
+__all__ = [
+    'PyEvaluator',
+    'PyEvaluatorReturnInManagerDict',
+    'PyEvaluatorReturnInSharedMemory'
+]
 
 
 def _set_mp_start_method(multiprocessing_start_method: Literal['default', 'auto', 'fork', 'spawn']):
@@ -243,7 +257,7 @@ class PyEvaluator(ABC):
             return None
 
 
-class PyEvaluatorForLargeReturnObject(PyEvaluator):
+class PyEvaluatorReturnInManagerDict(PyEvaluator):
     def __init__(
             self,
             exec_code: bool = True,
@@ -400,7 +414,7 @@ class PyEvaluatorForLargeReturnObject(PyEvaluator):
         return (result, eval_time) if get_evaluate_time else result
 
 
-class PyEvaluatorForLargeReturnObjectV2(PyEvaluator):
+class PyEvaluatorReturnInSharedMemory(PyEvaluator):
 
     def __init__(
             self,
@@ -413,7 +427,6 @@ class PyEvaluatorForLargeReturnObjectV2(PyEvaluator):
         """Evaluator interface for evaluating the Python algorithm program. Override this class and implement
         'evaluate_program' method, then invoke 'self.evaluate()' or 'self.secure_evaluate()' for evaluation.
         Note: This class supports the secure_evaluate to handle very big return object, e.g., Tensors.
-
         Args:
             exec_code: Using 'exec()' to execute the program code and obtain the callable functions and classes,
                 which will be passed to 'self.evaluate_program()'. Set this parameter to 'False' if you are going to
@@ -462,6 +475,7 @@ class PyEvaluatorForLargeReturnObjectV2(PyEvaluator):
             program_str: str,
             meta_queue: multiprocessing.Queue,
             redirect_to_devnull: bool,
+            shm_name_id: str,
             **kwargs
     ):
         """Evaluate and store result in shared memory (for large results)."""
@@ -472,26 +486,28 @@ class PyEvaluatorForLargeReturnObjectV2(PyEvaluator):
                 os.dup2(devnull.fileno(), sys.stderr.fileno())
 
         # Evaluate and get results
-        res = self.evaluate(program_str, **kwargs)
-
         try:
+            res = self.evaluate(program_str, **kwargs)
             # Dump the results to data
             data = pickle.dumps(res, protocol=pickle.HIGHEST_PROTOCOL)
-            # Create shared memory with the size of data
-            shm = shared_memory.SharedMemory(create=True, size=len(data))
+            # Create shared memory using the ID provided by the parent
+            # We must use create=True here as the child is responsible for allocation
+            shm = shared_memory.SharedMemory(create=True, name=shm_name_id, size=len(data))
             # Write data
             shm.buf[:len(data)] = data
-            # Send back shm metadata (shared_mem_name, shared_mem_size) and put them into the queue
-            meta_queue.put((shm.name, len(data)))
+            # We only need to send back the size, as the parent already knows the name.
+            # Sending (True, size) to indicate success.
+            meta_queue.put((True, len(data)))
             # Child closes its handle
             shm.close()
         except Exception as data_pickle_error:
             # Put the exception message to the queue
-            meta_queue.put((None, str(data_pickle_error)))
+            # Sending (False, error_message) to indicate failure.
+            meta_queue.put((False, str(data_pickle_error)))
 
     def secure_evaluate(
             self,
-            program: str | PyProgram,
+            program: str | PyProgram,  # Assuming PyProgram is defined
             timeout_seconds: int | float = None,
             redirect_to_devnull: bool = False,
             multiprocessing_start_method: str = 'auto',
@@ -512,24 +528,21 @@ class PyEvaluatorForLargeReturnObjectV2(PyEvaluator):
             Returns the evaluation results. If the 'get_evaluate_time' is True,
             the return value will be (Results, Time).
         """
-        if multiprocessing_start_method == 'auto':
-            if sys.platform.startswith('darwin') or sys.platform.startswith('linux'):
-                multiprocessing.set_start_method('fork', force=True)
-        elif multiprocessing_start_method == 'fork':
-            multiprocessing.set_start_method('fork', force=True)
-        elif multiprocessing_start_method == 'spawn':
-            multiprocessing.set_start_method('spawn', force=True)
-
+        _set_mp_start_method(multiprocessing_start_method)  # noqa
         meta_queue = multiprocessing.Queue()
+        # Generate a unique name for the shared memory block in the PARENT process.
+        # This allows the parent to clean it up even if the child is killed.
+        unique_shm_name = f'psm_{uuid.uuid4().hex[:8]}'
 
         process = multiprocessing.Process(
             target=self._evaluate_and_put_res_in_shared_memory,
-            args=(str(program), meta_queue, redirect_to_devnull),
+            args=(str(program), meta_queue, redirect_to_devnull, unique_shm_name),
             kwargs=kwargs,
         )
-
         evaluate_start_time = time.time()
         process.start()
+
+        result = None
 
         try:
             if timeout_seconds is not None:
@@ -542,6 +555,7 @@ class PyEvaluatorForLargeReturnObjectV2(PyEvaluator):
                     if self.debug_mode:
                         print(f'DEBUG: evaluation time exceeds {timeout_seconds}s.')
                     self._kill_process_and_its_children(process)
+                    # Directly return here, the 'finally' block will handle cleanup
                     return (None, eval_time) if get_evaluate_time else None
             else:
                 meta = meta_queue.get()
@@ -550,29 +564,52 @@ class PyEvaluatorForLargeReturnObjectV2(PyEvaluator):
             eval_time = time.time() - evaluate_start_time
             self._kill_process_and_its_children(process)
 
-            # If the first element in the queue is None,
-            # it means that the shared memory raises exceptions
-            if meta[0] is None:
+            # [NEW] meta is now (Success_Flag, Data_Size_or_Error_Msg)
+            success, payload = meta
+
+            if not success:
+                # Payload is the error message
                 if self.debug_mode:
-                    print(f'DEBUG: shared memory failed with exception: {meta[1]}')
+                    print(f'DEBUG: shared memory failed with exception: {payload}')
                 result = None
             else:
-                # Read results from metadata
-                shm_name, size = meta
-                shm = shared_memory.SharedMemory(name=shm_name)
-                buf = bytes(shm.buf[:size])
-                # Load results from buffer
-                result = pickle.loads(buf)
-                shm.close()
+                # Payload is the size of the data
+                size = payload
+                # Attach to the existing shared memory by name
                 try:
-                    shm.unlink()
+                    shm = shared_memory.SharedMemory(name=unique_shm_name)
+                    buf = bytes(shm.buf[:size])
+                    # Load results from buffer
+                    result = pickle.loads(buf)
+                    shm.close()
+                    # We do NOT unlink here immediately; we let the finally block handle it
+                    # to avoid code duplication, although unlinking here is also valid.
                 except FileNotFoundError:
-                    pass
+                    # Rare race condition or error
+                    result = None
+
         except Exception:
             eval_time = time.time() - evaluate_start_time
             if self.debug_mode:
                 print(f'DEBUG: exception in shared evaluate:\n{traceback.format_exc()}')
             self._kill_process_and_its_children(process)
             result = None
+
+        finally:
+            # Critical Cleanup: Ensure the shared memory is unlinked from the OS
+            # This runs whether the process finished, timed out, or crashed
+            try:
+                # Attempt to attach to the shared memory block
+                shm_cleanup = shared_memory.SharedMemory(name=unique_shm_name)
+                # Unlink (delete) it from the system, and close the shared memory
+                # shm_cleanup.unlink()  # Todo: enable unlink for individual OS
+                shm_cleanup.close()
+            except FileNotFoundError:
+                # This is normal if the child process never reached the creation step
+                # (e.g. crashed during calculation before creating SHM)
+                pass
+            except Exception as e:
+                if self.debug_mode:
+                    print(f'DEBUG: Error cleaning up shared memory: {e}')
 
         return (result, eval_time) if get_evaluate_time else result

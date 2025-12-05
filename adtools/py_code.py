@@ -170,8 +170,7 @@ class PyProgram:
     scripts: List[PyCodeBlock]  # Top-level code not in classes/functions
     functions: List[PyFunction]  # Top-level functions
     classes: List[PyClass]  # Top-level classes
-    # Complete sequence of the file elements.
-    elements: List[Union[PyFunction, PyClass, PyCodeBlock]]
+    elements: List[Union[PyFunction, PyClass, PyCodeBlock]]  # Complete sequence of the file elements.
 
     def __str__(self) -> str:
         program = ''
@@ -201,7 +200,6 @@ class _ProgramVisitor(ast.NodeVisitor):
 
     def __init__(self, sourcecode: str):
         self._codelines: List[str] = sourcecode.splitlines()
-
         self._scripts: List[PyCodeBlock] = []
         self._functions: List[PyFunction] = []
         self._classes: List[PyClass] = []
