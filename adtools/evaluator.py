@@ -50,6 +50,12 @@ def _set_mp_start_method(multiprocessing_start_method: Literal['default', 'auto'
         multiprocessing.set_start_method('spawn', force=True)
 
 
+def _redirect_to_devnull():
+    with open(os.devnull, 'w') as devnull:
+        os.dup2(devnull.fileno(), sys.stdout.fileno())
+        os.dup2(devnull.fileno(), sys.stderr.fileno())
+
+
 class PyEvaluator(ABC):
 
     def __init__(
@@ -173,9 +179,8 @@ class PyEvaluator(ABC):
     ):
         # Redirect STDOUT and STDERR to '/dev/null'
         if redirect_to_devnull:
-            with open(os.devnull, 'w') as devnull:
-                os.dup2(devnull.fileno(), sys.stdout.fileno())
-                os.dup2(devnull.fileno(), sys.stderr.fileno())
+            _redirect_to_devnull()
+        # Evaluate and get results
         try:
             # Evaluate and put the results to the queue
             res = self.evaluate(program_str, **kwargs)
@@ -315,10 +320,10 @@ class PyEvaluatorReturnInManagerDict(PyEvaluator):
             **kwargs
     ):
         """Evaluate and store result in Manager().dict() (for large results)."""
+        # Redirect STDOUT and STDERR to '/dev/null'
         if redirect_to_devnull:
-            with open(os.devnull, 'w') as devnull:
-                os.dup2(devnull.fileno(), sys.stdout.fileno())
-                os.dup2(devnull.fileno(), sys.stderr.fileno())
+            _redirect_to_devnull()
+        # Evaluate and get results
         try:
             # Evaluate and get results
             res = self.evaluate(program_str, **kwargs)
@@ -483,10 +488,7 @@ class PyEvaluatorReturnInSharedMemory(PyEvaluator):
         """Evaluate and store result in shared memory (for large results)."""
         # Redirect STDOUT and STDERR to '/dev/null'
         if redirect_to_devnull:
-            with open(os.devnull, 'w') as devnull:
-                os.dup2(devnull.fileno(), sys.stdout.fileno())
-                os.dup2(devnull.fileno(), sys.stderr.fileno())
-
+            _redirect_to_devnull()
         # Evaluate and get results
         try:
             res = self.evaluate(program_str, **kwargs)
