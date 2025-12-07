@@ -33,25 +33,27 @@ import traceback
 from .py_code import PyProgram
 
 __all__ = [
-    'PyEvaluator',
-    'PyEvaluatorReturnInManagerDict',
-    'PyEvaluatorReturnInSharedMemory'
+    "PyEvaluator",
+    "PyEvaluatorReturnInManagerDict",
+    "PyEvaluatorReturnInSharedMemory",
 ]
 
 
-def _set_mp_start_method(multiprocessing_start_method: Literal['default', 'auto', 'fork', 'spawn']):
-    if multiprocessing_start_method == 'auto':
+def _set_mp_start_method(
+    multiprocessing_start_method: Literal["default", "auto", "fork", "spawn"],
+):
+    if multiprocessing_start_method == "auto":
         # Force macOS and Linux use 'fork' to generate new process
-        if sys.platform.startswith('darwin') or sys.platform.startswith('linux'):
-            multiprocessing.set_start_method('fork', force=True)
-    elif multiprocessing_start_method == 'fork':
-        multiprocessing.set_start_method('fork', force=True)
-    elif multiprocessing_start_method == 'spawn':
-        multiprocessing.set_start_method('spawn', force=True)
+        if sys.platform.startswith("darwin") or sys.platform.startswith("linux"):
+            multiprocessing.set_start_method("fork", force=True)
+    elif multiprocessing_start_method == "fork":
+        multiprocessing.set_start_method("fork", force=True)
+    elif multiprocessing_start_method == "spawn":
+        multiprocessing.set_start_method("spawn", force=True)
 
 
 def _redirect_to_devnull():
-    with open(os.devnull, 'w') as devnull:
+    with open(os.devnull, "w") as devnull:
         os.dup2(devnull.fileno(), sys.stdout.fileno())
         os.dup2(devnull.fileno(), sys.stderr.fileno())
 
@@ -59,12 +61,12 @@ def _redirect_to_devnull():
 class PyEvaluator(ABC):
 
     def __init__(
-            self,
-            exec_code: bool = True,
-            find_and_kill_children_evaluation_process: bool = False,
-            debug_mode: bool = False,
-            *,
-            join_timeout_seconds: int = 10
+        self,
+        exec_code: bool = True,
+        find_and_kill_children_evaluation_process: bool = False,
+        debug_mode: bool = False,
+        *,
+        join_timeout_seconds: int = 10,
     ):
         """Evaluator interface for evaluating the Python algorithm program. Override this class and implement
         'evaluate_program' method, then invoke 'self.evaluate()' or 'self.secure_evaluate()' for evaluation.
@@ -81,18 +83,20 @@ class PyEvaluator(ABC):
         """
         self.debug_mode = debug_mode
         self.exec_code = exec_code
-        self.find_and_kill_children_evaluation_process = find_and_kill_children_evaluation_process
+        self.find_and_kill_children_evaluation_process = (
+            find_and_kill_children_evaluation_process
+        )
         self.join_timeout_seconds = join_timeout_seconds
 
     @abstractmethod
     def evaluate_program(
-            self,
-            program_str: str,
-            callable_functions_dict: Dict[str, Callable] | None,
-            callable_functions_list: List[Callable] | None,
-            callable_classes_dict: Dict[str, Callable] | None,
-            callable_classes_list: List[Callable] | None,
-            **kwargs
+        self,
+        program_str: str,
+        callable_functions_dict: Dict[str, Callable] | None,
+        callable_functions_list: List[Callable] | None,
+        callable_classes_dict: Dict[str, Callable] | None,
+        callable_classes_list: List[Callable] | None,
+        **kwargs,
     ) -> Any:
         """Evaluate a given program.
         Args:
@@ -105,8 +109,8 @@ class PyEvaluator(ABC):
             Returns the evaluation result.
         """
         raise NotImplementedError(
-            'Must provide an evaluator for a python program. '
-            'Override this method in a subclass.'
+            "Must provide an evaluator for a python program. "
+            "Override this method in a subclass."
         )
 
     def _kill_process_and_its_children(self, process: multiprocessing.Process):
@@ -149,15 +153,22 @@ class PyEvaluator(ABC):
             # Execute the program, map func/var/class to global namespace
             exec(str(program), all_globals_namespace)
             # Get callable functions
-            callable_funcs_list = [all_globals_namespace[f_name] for f_name in function_names]
+            callable_funcs_list = [
+                all_globals_namespace[f_name] for f_name in function_names
+            ]
             callable_funcs_dict = dict(zip(function_names, callable_funcs_list))
             # Get callable classes
-            callable_cls_list = [all_globals_namespace[c_name] for c_name in class_names]
+            callable_cls_list = [
+                all_globals_namespace[c_name] for c_name in class_names
+            ]
             callable_cls_dict = dict(zip(class_names, callable_cls_list))
         else:
-            callable_funcs_list, callable_funcs_dict, callable_cls_list, callable_cls_dict = (
-                None, None, None, None
-            )
+            (
+                callable_funcs_list,
+                callable_funcs_dict,
+                callable_cls_list,
+                callable_cls_dict,
+            ) = (None, None, None, None)
 
         # Get evaluate result
         res = self.evaluate_program(
@@ -166,16 +177,16 @@ class PyEvaluator(ABC):
             callable_funcs_list,
             callable_cls_dict,
             callable_cls_list,
-            **kwargs
+            **kwargs,
         )
         return res
 
     def _evaluate_in_safe_process(
-            self,
-            program_str: str,
-            result_queue: multiprocessing.Queue,
-            redirect_to_devnull: bool,
-            **kwargs
+        self,
+        program_str: str,
+        result_queue: multiprocessing.Queue,
+        redirect_to_devnull: bool,
+        **kwargs,
     ):
         # Redirect STDOUT and STDERR to '/dev/null'
         if redirect_to_devnull:
@@ -190,13 +201,15 @@ class PyEvaluator(ABC):
             result_queue.put(None)
 
     def secure_evaluate(
-            self,
-            program: str | PyProgram,
-            timeout_seconds: int | float = None,
-            redirect_to_devnull: bool = False,
-            multiprocessing_start_method: Literal['default', 'auto', 'fork', 'spawn'] = 'auto',
-            get_evaluate_time=False,
-            **kwargs
+        self,
+        program: str | PyProgram,
+        timeout_seconds: int | float = None,
+        redirect_to_devnull: bool = False,
+        multiprocessing_start_method: Literal[
+            "default", "auto", "fork", "spawn"
+        ] = "auto",
+        get_evaluate_time=False,
+        **kwargs,
     ) -> Any | Tuple[Any, float]:
         """Evaluate program in a new process. This enables timeout restriction and output redirection.
         Args:
@@ -237,7 +250,7 @@ class PyEvaluator(ABC):
                     # Calculate the evaluate time
                     eval_time = time.time() - evaluate_start_time
                     if self.debug_mode:
-                        print(f'DEBUG: the evaluation time exceeds {timeout_seconds}s.')
+                        print(f"DEBUG: the evaluation time exceeds {timeout_seconds}s.")
                     # Terminate and kill all processes if timeout happens
                     self._kill_process_and_its_children(process)
                     result = None
@@ -245,7 +258,9 @@ class PyEvaluator(ABC):
                     # Calculate the evaluate time
                     eval_time = time.time() - evaluate_start_time
                     if self.debug_mode:
-                        print(f'DEBUG: evaluation failed with exception:\n{traceback.format_exc()}')
+                        print(
+                            f"DEBUG: evaluation failed with exception:\n{traceback.format_exc()}"
+                        )
                     # Terminate and kill all processes if meet exceptions
                     self._kill_process_and_its_children(process)
                     result = None
@@ -266,58 +281,57 @@ class PyEvaluator(ABC):
 
 class PyEvaluatorReturnInManagerDict(PyEvaluator):
     def __init__(
-            self,
-            exec_code: bool = True,
-            find_and_kill_children_evaluation_process: bool = False,
-            debug_mode: bool = False,
-            *,
-            join_timeout_seconds: int = 10
+        self,
+        exec_code: bool = True,
+        find_and_kill_children_evaluation_process: bool = False,
+        debug_mode: bool = False,
+        *,
+        join_timeout_seconds: int = 10,
     ):
         """Evaluator interface for evaluating the Python algorithm program. Override this class and implement
-         'evaluate_program' method, then invoke 'self.evaluate()' or 'self.secure_evaluate()' for evaluation.
+        'evaluate_program' method, then invoke 'self.evaluate()' or 'self.secure_evaluate()' for evaluation.
+        Note: This class supports the secure_evaluate to handle very big return object, e.g., Tensors.
 
-         **Note:** This class supports the secure_evaluate to handle very big return object, e.g., Tensors.
-
-         Args:
-             exec_code: Using 'exec()' to execute the program code and obtain the callable functions and classes,
-                 which will be passed to 'self.evaluate_program()'. Set this parameter to 'False' if you are going to
-                 evaluate a Python scripy. Note that if the parameter is set to 'False', the arguments 'callable_...'
-                 in 'self.evaluate_program()' will no longer be affective.
-             find_and_kill_children_evaluation_process: If using 'self.secure_evaluate', kill children processes
-                 when they are terminated. Note that it is suggested to set to 'False' if the evaluation process
-                 does not start new processes.
-             debug_mode: Debug mode.
-             join_timeout_seconds: Timeout in seconds to wait for the process to finish. Kill the process if timeout.
-         """
+        Args:
+            exec_code: Using 'exec()' to execute the program code and obtain the callable functions and classes,
+                which will be passed to 'self.evaluate_program()'. Set this parameter to 'False' if you are going to
+                evaluate a Python scripy. Note that if the parameter is set to 'False', the arguments 'callable_...'
+                in 'self.evaluate_program()' will no longer be affective.
+            find_and_kill_children_evaluation_process: If using 'self.secure_evaluate', kill children processes
+                when they are terminated. Note that it is suggested to set to 'False' if the evaluation process
+                does not start new processes.
+            debug_mode: Debug mode.
+            join_timeout_seconds: Timeout in seconds to wait for the process to finish. Kill the process if timeout.
+        """
         super().__init__(
             exec_code,
             find_and_kill_children_evaluation_process,
             debug_mode,
-            join_timeout_seconds=join_timeout_seconds
+            join_timeout_seconds=join_timeout_seconds,
         )
 
     @abstractmethod
     def evaluate_program(
-            self,
-            program_str: str,
-            callable_functions_dict: Dict[str, Callable] | None,
-            callable_functions_list: List[Callable] | None,
-            callable_classes_dict: Dict[str, Callable] | None,
-            callable_classes_list: List[Callable] | None,
-            **kwargs
+        self,
+        program_str: str,
+        callable_functions_dict: Dict[str, Callable] | None,
+        callable_functions_list: List[Callable] | None,
+        callable_classes_dict: Dict[str, Callable] | None,
+        callable_classes_list: List[Callable] | None,
+        **kwargs,
     ) -> Any:
         raise NotImplementedError(
-            'Must provide an evaluator for a python program. '
-            'Override this method in a subclass.'
+            "Must provide an evaluator for a python program. "
+            "Override this method in a subclass."
         )
 
     def _evaluate_and_put_res_in_manager_dict(
-            self,
-            program_str: str,
-            result_dict: multiprocessing.managers.DictProxy,
-            signal_queue: multiprocessing.Queue,
-            redirect_to_devnull: bool,
-            **kwargs
+        self,
+        program_str: str,
+        result_dict: multiprocessing.managers.DictProxy,
+        signal_queue: multiprocessing.Queue,
+        redirect_to_devnull: bool,
+        **kwargs,
     ):
         """Evaluate and store result in Manager().dict() (for large results)."""
         # Redirect STDOUT and STDERR to '/dev/null'
@@ -328,25 +342,27 @@ class PyEvaluatorReturnInManagerDict(PyEvaluator):
             # Evaluate and get results
             res = self.evaluate(program_str, **kwargs)
             # Write results into dict
-            result_dict['result'] = res
+            result_dict["result"] = res
             # Put a signal to queue to inform the parent process the evaluation has done
-            signal_queue.put(('ok', None))
+            signal_queue.put(("ok", None))
         except Exception as e:
             if self.debug_mode:
                 traceback.print_exc()
             # Write results into dict
-            result_dict['result'] = None
+            result_dict["result"] = None
             # Put a signal to queue to inform the parent process the evaluation has terminated
-            signal_queue.put(('error', str(e)))
+            signal_queue.put(("error", str(e)))
 
     def secure_evaluate(
-            self,
-            program: str | PyProgram,
-            timeout_seconds: int | float = None,
-            redirect_to_devnull: bool = False,
-            multiprocessing_start_method: Literal['default', 'auto', 'fork', 'spawn'] = 'auto',
-            get_evaluate_time: bool = False,
-            **kwargs
+        self,
+        program: str | PyProgram,
+        timeout_seconds: int | float = None,
+        redirect_to_devnull: bool = False,
+        multiprocessing_start_method: Literal[
+            "default", "auto", "fork", "spawn"
+        ] = "auto",
+        get_evaluate_time: bool = False,
+        **kwargs,
     ):
         """Evaluate program in a new process. This enables timeout restriction and output redirection.
         Args:
@@ -387,7 +403,7 @@ class PyEvaluatorReturnInManagerDict(PyEvaluator):
                         # Evaluation timeout happens, we return 'None' as well as the actual evaluate time
                         eval_time = time.time() - evaluate_start_time
                         if self.debug_mode:
-                            print(f'DEBUG: evaluation time exceeds {timeout_seconds}s.')
+                            print(f"DEBUG: evaluation time exceeds {timeout_seconds}s.")
                         # Terminate and kill all processes after evaluation
                         self._kill_process_and_its_children(process)
                         return (None, eval_time) if get_evaluate_time else None
@@ -401,19 +417,21 @@ class PyEvaluatorReturnInManagerDict(PyEvaluator):
                 self._kill_process_and_its_children(process)
 
                 # The first element is 'ok' indicates that the evaluation terminate without exceptions
-                if signal[0] == 'ok':
+                if signal[0] == "ok":
                     # We get the evaluation results from 'manager.dict'
-                    result = result_dict.get('result', None)
+                    result = result_dict.get("result", None)
                 else:
                     # The evaluation failed for some reason, so we set the result to 'None'
                     if self.debug_mode:
-                        print(f'DEBUG: child process error: {signal[1]}')
+                        print(f"DEBUG: child process error: {signal[1]}")
                     result = None
             except:
                 # If there is any exception during above procedure, we set the result to None
                 eval_time = time.time() - evaluate_start_time
                 if self.debug_mode:
-                    print(f'DEBUG: exception in manager evaluate:\n{traceback.format_exc()}')
+                    print(
+                        f"DEBUG: exception in manager evaluate:\n{traceback.format_exc()}"
+                    )
                 # Terminate and kill all processes after evaluation
                 self._kill_process_and_its_children(process)
                 result = None
@@ -424,12 +442,12 @@ class PyEvaluatorReturnInManagerDict(PyEvaluator):
 class PyEvaluatorReturnInSharedMemory(PyEvaluator):
 
     def __init__(
-            self,
-            exec_code: bool = True,
-            find_and_kill_children_evaluation_process: bool = False,
-            debug_mode: bool = False,
-            *,
-            join_timeout_seconds: int = 10
+        self,
+        exec_code: bool = True,
+        find_and_kill_children_evaluation_process: bool = False,
+        debug_mode: bool = False,
+        *,
+        join_timeout_seconds: int = 10,
     ):
         """Evaluator interface for evaluating the Python algorithm program. Override this class and implement
         'evaluate_program' method, then invoke 'self.evaluate()' or 'self.secure_evaluate()' for evaluation.
@@ -449,18 +467,18 @@ class PyEvaluatorReturnInSharedMemory(PyEvaluator):
             exec_code,
             find_and_kill_children_evaluation_process,
             debug_mode,
-            join_timeout_seconds=join_timeout_seconds
+            join_timeout_seconds=join_timeout_seconds,
         )
 
     @abstractmethod
     def evaluate_program(
-            self,
-            program_str: str,
-            callable_functions_dict: Dict[str, Callable] | None,
-            callable_functions_list: List[Callable] | None,
-            callable_classes_dict: Dict[str, Callable] | None,
-            callable_classes_list: List[Callable] | None,
-            **kwargs
+        self,
+        program_str: str,
+        callable_functions_dict: Dict[str, Callable] | None,
+        callable_functions_list: List[Callable] | None,
+        callable_classes_dict: Dict[str, Callable] | None,
+        callable_classes_list: List[Callable] | None,
+        **kwargs,
     ) -> Any:
         """Evaluate a given program.
         Args:
@@ -473,17 +491,17 @@ class PyEvaluatorReturnInSharedMemory(PyEvaluator):
             Returns the evaluation result.
         """
         raise NotImplementedError(
-            'Must provide an evaluator for a python program. '
-            'Override this method in a subclass.'
+            "Must provide an evaluator for a python program. "
+            "Override this method in a subclass."
         )
 
     def _evaluate_and_put_res_in_shared_memory(
-            self,
-            program_str: str,
-            meta_queue: multiprocessing.Queue,
-            redirect_to_devnull: bool,
-            shm_name_id: str,
-            **kwargs
+        self,
+        program_str: str,
+        meta_queue: multiprocessing.Queue,
+        redirect_to_devnull: bool,
+        shm_name_id: str,
+        **kwargs,
     ):
         """Evaluate and store result in shared memory (for large results)."""
         # Redirect STDOUT and STDERR to '/dev/null'
@@ -496,9 +514,11 @@ class PyEvaluatorReturnInSharedMemory(PyEvaluator):
             data = pickle.dumps(res, protocol=pickle.HIGHEST_PROTOCOL)
             # Create shared memory using the ID provided by the parent
             # We must use create=True here as the child is responsible for allocation
-            shm = shared_memory.SharedMemory(create=True, name=shm_name_id, size=len(data))
+            shm = shared_memory.SharedMemory(
+                create=True, name=shm_name_id, size=len(data)
+            )
             # Write data
-            shm.buf[:len(data)] = data
+            shm.buf[: len(data)] = data
             # We only need to send back the size, as the parent already knows the name.
             # Sending (True, size) to indicate success.
             meta_queue.put((True, len(data)))
@@ -510,13 +530,13 @@ class PyEvaluatorReturnInSharedMemory(PyEvaluator):
             meta_queue.put((False, str(data_pickle_error)))
 
     def secure_evaluate(
-            self,
-            program: str | PyProgram,  # Assuming PyProgram is defined
-            timeout_seconds: int | float = None,
-            redirect_to_devnull: bool = False,
-            multiprocessing_start_method: str = 'auto',
-            get_evaluate_time: bool = False,
-            **kwargs
+        self,
+        program: str | PyProgram,  # Assuming PyProgram is defined
+        timeout_seconds: int | float = None,
+        redirect_to_devnull: bool = False,
+        multiprocessing_start_method: str = "auto",
+        get_evaluate_time: bool = False,
+        **kwargs,
     ):
         """Evaluate program in a new process. This enables timeout restriction and output redirection.
         Args:
@@ -536,7 +556,7 @@ class PyEvaluatorReturnInSharedMemory(PyEvaluator):
         meta_queue = multiprocessing.Queue()
         # Generate a unique name for the shared memory block in the PARENT process.
         # This allows the parent to clean it up even if the child is killed.
-        unique_shm_name = f'psm_{uuid.uuid4().hex[:8]}'
+        unique_shm_name = f"psm_{uuid.uuid4().hex[:8]}"
 
         process = multiprocessing.Process(
             target=self._evaluate_and_put_res_in_shared_memory,
@@ -557,7 +577,7 @@ class PyEvaluatorReturnInSharedMemory(PyEvaluator):
                     # Evaluate timeout
                     eval_time = time.time() - evaluate_start_time
                     if self.debug_mode:
-                        print(f'DEBUG: evaluation time exceeds {timeout_seconds}s.')
+                        print(f"DEBUG: evaluation time exceeds {timeout_seconds}s.")
                     self._kill_process_and_its_children(process)
                     # Directly return here, the 'finally' block will handle cleanup
                     return (None, eval_time) if get_evaluate_time else None
@@ -574,7 +594,7 @@ class PyEvaluatorReturnInSharedMemory(PyEvaluator):
             if not success:
                 # Payload is the error message
                 if self.debug_mode:
-                    print(f'DEBUG: shared memory failed with exception: {payload}')
+                    print(f"DEBUG: shared memory failed with exception: {payload}")
                 result = None
             else:
                 # Payload is the size of the data
@@ -595,7 +615,7 @@ class PyEvaluatorReturnInSharedMemory(PyEvaluator):
         except Exception:
             eval_time = time.time() - evaluate_start_time
             if self.debug_mode:
-                print(f'DEBUG: exception in shared evaluate:\n{traceback.format_exc()}')
+                print(f"DEBUG: exception in shared evaluate:\n{traceback.format_exc()}")
             self._kill_process_and_its_children(process)
             result = None
 
@@ -614,6 +634,6 @@ class PyEvaluatorReturnInSharedMemory(PyEvaluator):
                 pass
             except Exception as e:
                 if self.debug_mode:
-                    print(f'DEBUG: Error cleaning up shared memory: {e}')
+                    print(f"DEBUG: Error cleaning up shared memory: {e}")
 
         return (result, eval_time) if get_evaluate_time else result

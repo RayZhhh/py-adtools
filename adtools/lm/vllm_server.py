@@ -29,35 +29,37 @@ from .lm_base import LanguageModel
 
 
 def _print_cmd_list(cmd_list, gpus, host, port):
-    print('\n' + '=' * 80)
-    print(f'[vLLM] Launching vLLM on GPU:{gpus}; URL: https://{host}:{port}')
-    print('=' * 80)
-    cmd = cmd_list[0] + ' \\\n'
+    print("\n" + "=" * 80)
+    print(f"[vLLM] Launching vLLM on GPU:{gpus}; URL: https://{host}:{port}")
+    print("=" * 80)
+    cmd = cmd_list[0] + " \\\n"
     for c in cmd_list[1:]:
-        cmd += '    ' + c + ' \\\n'
+        cmd += "    " + c + " \\\n"
     print(cmd.strip())
-    print('=' * 80 + '\n', flush=True)
+    print("=" * 80 + "\n", flush=True)
 
 
 class VLLMServer(LanguageModel):
     def __init__(
-            self,
-            model_path: str,
-            port: int,
-            gpus: int | list[int],
-            tokenizer_path: Optional[str] = None,
-            max_model_len: int = 16384,
-            max_lora_rank: Optional[int] = None,
-            host: str = '0.0.0.0',
-            mem_util: float = 0.85,
-            deploy_timeout_seconds: int = 600,
-            enforce_eager: bool = False,
-            vllm_log_level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] = 'INFO',
-            silent_mode: bool = False,
-            env_variable_dict: Optional[Dict[str, str]] = None,
-            vllm_serve_args: Optional[List[str]] = None,
-            vllm_serve_kwargs: Optional[Dict[str, str]] = None,
-            chat_template_kwargs: Optional[Dict[str, Any]] = None
+        self,
+        model_path: str,
+        port: int,
+        gpus: int | list[int],
+        tokenizer_path: Optional[str] = None,
+        max_model_len: int = 16384,
+        max_lora_rank: Optional[int] = None,
+        host: str = "0.0.0.0",
+        mem_util: float = 0.85,
+        deploy_timeout_seconds: int = 600,
+        enforce_eager: bool = False,
+        vllm_log_level: Literal[
+            "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+        ] = "INFO",
+        silent_mode: bool = False,
+        env_variable_dict: Optional[Dict[str, str]] = None,
+        vllm_serve_args: Optional[List[str]] = None,
+        vllm_serve_kwargs: Optional[Dict[str, str]] = None,
+        chat_template_kwargs: Optional[Dict[str, Any]] = None,
     ):
         """Deploy an LLM on specified GPUs.
         Args:
@@ -102,7 +104,9 @@ class VLLMServer(LanguageModel):
         self._model_path = model_path
         self._port = port
         self._gpus = gpus
-        self._tokenizer_path = tokenizer_path if tokenizer_path is not None else model_path
+        self._tokenizer_path = (
+            tokenizer_path if tokenizer_path is not None else model_path
+        )
         self._max_model_len = max_model_len
         self._max_lora_rank = max_lora_rank
         self._host = host
@@ -121,30 +125,38 @@ class VLLMServer(LanguageModel):
         self._wait_for_vllm()
 
     def _launch_vllm(self):
-        """Launch a vLLM server and return the subprocess.
-        """
+        """Launch a vLLM server and return the subprocess."""
         if isinstance(self._gpus, int):
             gpus = str(self._gpus)
         else:
-            gpus = ','.join([str(g) for g in self._gpus])
+            gpus = ",".join([str(g) for g in self._gpus])
 
         executable_path = sys.executable
         cmd = [
-            executable_path, '-m',
-            'vllm.entrypoints.openai.api_server',
-            '--model', self._model_path,
-            '--tokenizer', self._tokenizer_path,
-            '--max_model_len', str(self._max_model_len),
-            '--host', self._host,
-            '--port', str(self._port),
-            '--gpu-memory-utilization', str(self._mem_util),
-            '--tensor-parallel-size', str(len(self._gpus)) if isinstance(self._gpus, list) else '1',
-            '--trust-remote-code',
-            '--chat-template-content-format', 'string',
+            executable_path,
+            "-m",
+            "vllm.entrypoints.openai.api_server",
+            "--model",
+            self._model_path,
+            "--tokenizer",
+            self._tokenizer_path,
+            "--max_model_len",
+            str(self._max_model_len),
+            "--host",
+            self._host,
+            "--port",
+            str(self._port),
+            "--gpu-memory-utilization",
+            str(self._mem_util),
+            "--tensor-parallel-size",
+            str(len(self._gpus)) if isinstance(self._gpus, list) else "1",
+            "--trust-remote-code",
+            "--chat-template-content-format",
+            "string",
         ]
 
         if self._enforce_eager:
-            cmd.append('--enforce_eager')
+            cmd.append("--enforce_eager")
 
         # Other args for vllm serve
         if self._vllm_serve_args is not None:
@@ -158,24 +170,27 @@ class VLLMServer(LanguageModel):
 
         # Environmental variables
         env = os.environ.copy()
-        env['CUDA_VISIBLE_DEVICES'] = gpus
-        env['VLLM_LOGGING_LEVEL'] = self._vllm_log_level
+        env["CUDA_VISIBLE_DEVICES"] = gpus
+        env["VLLM_LOGGING_LEVEL"] = self._vllm_log_level
 
         # FIXME: These code are required for my machine :(
         # FIXME: This may due to the bad NCCL configuration :(
         if isinstance(self._gpus, list) and len(self._gpus) > 1:
             # set NCCL environment variable
-            env['NCCL_P2P_DISABLE'] = '1'
+            env["NCCL_P2P_DISABLE"] = "1"
             # disable custom all reduce
-            cmd.append('--disable-custom-all-reduce')
+            cmd.append("--disable-custom-all-reduce")
 
         # Enable LoRA dynamic loading
         if self._max_lora_rank is not None:
-            cmd.extend([
-                '--enable-lora',
-                '--max-lora-rank', str(self._max_lora_rank),
-            ])
-            env['VLLM_ALLOW_RUNTIME_LORA_UPDATING'] = 'True'
+            cmd.extend(
+                [
+                    "--enable-lora",
+                    "--max-lora-rank",
+                    str(self._max_lora_rank),
+                ]
+            )
+            env["VLLM_ALLOW_RUNTIME_LORA_UPDATING"] = "True"
 
         # Other env variables
         if self._env_variable_dict is not None:
@@ -185,7 +200,7 @@ class VLLMServer(LanguageModel):
         _print_cmd_list(cmd, gpus=self._gpus, host=self._host, port=self._port)
 
         # Launch vllm using subprocess
-        stdout = Path(os.devnull).open('w') if self._silent_mode else None
+        stdout = Path(os.devnull).open("w") if self._silent_mode else None
         proc = subprocess.Popen(cmd, env=env, stdout=stdout, stderr=subprocess.STDOUT)
         return proc
 
@@ -201,7 +216,7 @@ class VLLMServer(LanguageModel):
             # Terminate parent process
             self._process.terminate()
             self._process.wait(timeout=5)
-            print(f'[vLLM] terminated process: {self._process.pid}')
+            print(f"[vLLM] terminated process: {self._process.pid}")
 
             # Kill any remaining children
             for child in children:
@@ -215,18 +230,17 @@ class VLLMServer(LanguageModel):
                         pass
         except subprocess.TimeoutExpired:
             self._process.kill()
-            print(f'[vLLM] killed process: {self._process.pid}')
+            print(f"[vLLM] killed process: {self._process.pid}")
 
     def _wait_for_vllm(self):
-        """Check each vLLM server's state and check /health. Kill all vLLM server processes if timeout.
-        """
+        """Check each vLLM server's state and check /health. Kill all vLLM server processes if timeout."""
         for _ in range(self._deploy_timeout_seconds):
             # check process status
             if self._process.poll() is not None:
-                sys.exit(f'[vLLM] crashed (exit {self._process.returncode})')
+                sys.exit(f"[vLLM] crashed (exit {self._process.returncode})")
 
             # check server status
-            health = f'http://{self._host}:{self._port}/health'
+            health = f"http://{self._host}:{self._port}/health"
             try:
                 if requests.get(health, timeout=1).status_code == 200:
                     return
@@ -235,24 +249,26 @@ class VLLMServer(LanguageModel):
             time.sleep(1)
 
         # Servers fail to initialize
-        print('[vLLM] failed to start within timeout')
+        print("[vLLM] failed to start within timeout")
         self._kill_vllm_process()
-        sys.exit('[vLLM] failed to start within timeout')
+        sys.exit("[vLLM] failed to start within timeout")
 
     def unload_lora_adapter(self, lora_name: str):
         """Unload lora adapter given the lora name.
         Args:
             lora_name: Lora adapter name.
         """
-        lora_api_url = f'http://{self._host}:{self._port}/v1/unload_lora_adapter'
-        headers = {'Content-Type': 'application/json'}
+        lora_api_url = f"http://{self._host}:{self._port}/v1/unload_lora_adapter"
+        headers = {"Content-Type": "application/json"}
         try:
-            payload = {'lora_name': lora_name}
+            payload = {"lora_name": lora_name}
             requests.post(lora_api_url, json=payload, headers=headers, timeout=10)
         except requests.exceptions.RequestException:
             pass
 
-    def load_lora_adapter(self, lora_name: str, new_adapter_path: str, num_trails: int = 5):
+    def load_lora_adapter(
+        self, lora_name: str, new_adapter_path: str, num_trails: int = 5
+    ):
         """Dynamically load a LoRA adapter.
         Args:
             lora_name: LoRA adapter name.
@@ -262,27 +278,35 @@ class VLLMServer(LanguageModel):
         self.unload_lora_adapter(lora_name)
 
         if self._max_lora_rank is None:
-            raise ValueError('LoRA is not enabled for this VLLMServer instance, since "max_lora_rank" is not set.')
+            raise ValueError(
+                'LoRA is not enabled for this VLLMServer instance, since "max_lora_rank" is not set.'
+            )
 
         # Prepare the payload for LoRA update
-        payload = {'lora_name': lora_name, 'lora_path': new_adapter_path}
-        headers = {'Content-Type': 'application/json'}
-        lora_api_url = f'http://{self._host}:{self._port}/v1/load_lora_adapter'
+        payload = {"lora_name": lora_name, "lora_path": new_adapter_path}
+        headers = {"Content-Type": "application/json"}
+        lora_api_url = f"http://{self._host}:{self._port}/v1/load_lora_adapter"
 
         # Repeatedly trying to load lora adapters
         for i in range(num_trails):
             try:
-                response = requests.post(lora_api_url, json=payload, headers=headers, timeout=60)
+                response = requests.post(
+                    lora_api_url, json=payload, headers=headers, timeout=60
+                )
                 if response.status_code == 200:
-                    print(f'[vLLM] Successfully load LoRA adapter: {lora_name} from {new_adapter_path}')
+                    print(
+                        f"[vLLM] Successfully load LoRA adapter: {lora_name} from {new_adapter_path}"
+                    )
                 else:
-                    print(f'[vLLM] Failed to load LoRA adapter. '
-                          f'Status code: {response.status_code}, Response: {response.text}')
+                    print(
+                        f"[vLLM] Failed to load LoRA adapter. "
+                        f"Status code: {response.status_code}, Response: {response.text}"
+                    )
                 return True
             except requests.exceptions.RequestException:
                 continue
 
-        print(f'[vLLM] Error loading LoRA adapter.')
+        print(f"[vLLM] Error loading LoRA adapter.")
         return False
 
     def close(self):
@@ -294,14 +318,14 @@ class VLLMServer(LanguageModel):
         self._wait_for_vllm()
 
     def chat_completion(
-            self,
-            message: str | List[openai.types.chat.ChatCompletionMessageParam],
-            max_tokens: Optional[int] = None,
-            timeout_seconds: Optional[int] = None,
-            lora_name: Optional[str] = None,
-            temperature: float = 0.9,
-            top_p: float = 0.9,
-            chat_template_kwargs: Optional[Dict[str, Any]] = None
+        self,
+        message: str | List[openai.types.chat.ChatCompletionMessageParam],
+        max_tokens: Optional[int] = None,
+        timeout_seconds: Optional[int] = None,
+        lora_name: Optional[str] = None,
+        temperature: float = 0.9,
+        top_p: float = 0.9,
+        chat_template_kwargs: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Send a chat completion query with OpenAI format to the vLLM server. Return the response content.
         Args:
@@ -314,23 +338,29 @@ class VLLMServer(LanguageModel):
             chat_template_kwargs: The chat template kwargs, e.g., {'enable_thinking': False}.
         """
         data = {
-            'messages': [
-                {'role': 'user', 'content': message.strip()} if isinstance(message, str) else message
+            "messages": [
+                (
+                    {"role": "user", "content": message.strip()}
+                    if isinstance(message, str)
+                    else message
+                )
             ],
-            'temperature': temperature,
-            'top_p': top_p,
-            'max_tokens': max_tokens,
+            "temperature": temperature,
+            "top_p": top_p,
+            "max_tokens": max_tokens,
         }
         # Use the specified lora adapter
         if lora_name is not None:
-            data['model'] = lora_name
+            data["model"] = lora_name
         # Chat template keyword args
         if self._chat_template_kwargs is not None:
-            data['chat_template_kwargs'] = self._chat_template_kwargs
+            data["chat_template_kwargs"] = self._chat_template_kwargs
         elif chat_template_kwargs is not None:
-            data['chat_template_kwargs'] = chat_template_kwargs
+            data["chat_template_kwargs"] = chat_template_kwargs
         # Request
-        url = f'http://{self._host}:{self._port}/v1/chat/completions'
-        headers = {'Content-Type': 'application/json'}
-        response = requests.post(url, headers=headers, json=data, timeout=timeout_seconds)
-        return response.json()['choices'][0]['message']['content']
+        url = f"http://{self._host}:{self._port}/v1/chat/completions"
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(
+            url, headers=headers, json=data, timeout=timeout_seconds
+        )
+        return response.json()["choices"][0]["message"]["content"]

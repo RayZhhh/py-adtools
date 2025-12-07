@@ -7,13 +7,13 @@ from adtools.evaluator import PyEvaluatorReturnInSharedMemory
 
 class SortAlgorithmEvaluator(PyEvaluatorReturnInSharedMemory):
     def evaluate_program(
-            self,
-            program_str: str,
-            callable_functions_dict: Dict[str, Callable] | None,
-            callable_functions_list: List[Callable] | None,
-            callable_classes_dict: Dict[str, Callable] | None,
-            callable_classes_list: List[Callable] | None,
-            **kwargs
+        self,
+        program_str: str,
+        callable_functions_dict: Dict[str, Callable] | None,
+        callable_functions_list: List[Callable] | None,
+        callable_classes_dict: Dict[str, Callable] | None,
+        callable_classes_list: List[Callable] | None,
+        **kwargs,
     ) -> Any | None:
         """Evaluate a given sort algorithm program.
         Args:
@@ -26,7 +26,7 @@ class SortAlgorithmEvaluator(PyEvaluatorReturnInSharedMemory):
             Returns the evaluation result.
         """
         # Get the sort algorithm
-        sort_algo: Callable = callable_functions_dict['merge_sort']
+        sort_algo: Callable = callable_functions_dict["merge_sort"]
         # Test data
         input = [10, 2, 4, 76, 19, 29, 3, 5, 1]
         # Compute execution time
@@ -39,7 +39,7 @@ class SortAlgorithmEvaluator(PyEvaluatorReturnInSharedMemory):
             return None  # Return None as the algorithm is incorrect
 
 
-code_generated_by_llm = '''
+code_generated_by_llm = """
 def merge_sort(arr):
     if len(arr) <= 1:
         return arr
@@ -66,27 +66,27 @@ def merge(left, right):
     result.extend(right[j:])
 
     return result
-'''
+"""
 
-harmful_code_generated_by_llm = '''
+harmful_code_generated_by_llm = """
 def merge_sort(arr):
     print('I am harmful')  # There will be no output since we redirect STDOUT to /dev/null by default.
     while True:
         pass
-'''
+"""
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     evaluator = SortAlgorithmEvaluator(debug_mode=True)
 
     # Evaluate
     score = evaluator.evaluate(code_generated_by_llm)
-    print(f'Score: {score}')
+    print(f"Score: {score}")
 
     # Secure evaluate (the evaluation is executed in a sandbox process)
     score = evaluator.secure_evaluate(code_generated_by_llm, timeout_seconds=10)
-    print(f'Score: {score}')
+    print(f"Score: {score}")
 
     # Evaluate a harmful code, the evaluation will be terminated within 10 seconds
     # We will obtain a score of `None` due to the violation of time restriction
     score = evaluator.secure_evaluate(harmful_code_generated_by_llm, timeout_seconds=10)
-    print(f'Score: {score}')
+    print(f"Score: {score}")

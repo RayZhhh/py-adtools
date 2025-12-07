@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "py-adtools"
+version = "0.1.11"
+description = "Useful tools for parsing and evaluating Python programs for LLM-based algorithm design."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Rui Zhang", email = "rzhang.cs@gmail.com" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "psutil",
+    "openai",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/RayZhhh/py-adtools"
+
+[tool.setuptools.packages.find]
+where = ["."]

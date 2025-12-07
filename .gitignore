@@ -7,3 +7,4 @@ py_adtools.egg-info
 **/__pycache__
 remove_files.sh
 _ignore_files
+.gitignore

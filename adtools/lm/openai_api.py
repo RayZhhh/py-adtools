@@ -15,41 +15,41 @@ from .lm_base import LanguageModel
 
 class OpenAIAPI(LanguageModel):
     def __init__(
-            self,
-            model: str,
-            base_url: str = None,
-            api_key: str = None,
-            **openai_init_kwargs
+        self,
+        model: str,
+        base_url: str = None,
+        api_key: str = None,
+        **openai_init_kwargs,
     ):
         super().__init__()
         # If base_url is set to None, find 'OPENAI_BASE_URL' in environment variables
         if base_url is None:
-            if 'OPENAI_BASE_URL' not in os.environ:
-                raise RuntimeError('If "base_url" is None, the environment variable OPENAI_BASE_URL must be set.')
+            if "OPENAI_BASE_URL" not in os.environ:
+                raise RuntimeError(
+                    'If "base_url" is None, the environment variable OPENAI_BASE_URL must be set.'
+                )
             else:
-                base_url = os.environ['OPENAI_BASE_URL']
+                base_url = os.environ["OPENAI_BASE_URL"]
 
         # If api_key is set to None, find 'OPENAI_API_KEY' in environment variables
         if api_key is None:
-            if 'OPENAI_API_KEY' not in os.environ:
+            if "OPENAI_API_KEY" not in os.environ:
                 raise RuntimeError('If "api_key" is None, OPENAI_API_KEY must be set.')
             else:
-                api_key = os.environ['OPENAI_API_KEY']
+                api_key = os.environ["OPENAI_API_KEY"]
 
         self._model = model
         self._client = openai.OpenAI(
-            api_key=api_key,
-            base_url=base_url,
-            **openai_init_kwargs
+            api_key=api_key, base_url=base_url, **openai_init_kwargs
         )
 
     def chat_completion(
-            self,
-            message: str | List[openai.types.chat.ChatCompletionMessageParam],
-            max_tokens: Optional[int] = None,
-            timeout_seconds: Optional[float] = None,
-            *args,
-            **kwargs
+        self,
+        message: str | List[openai.types.chat.ChatCompletionMessageParam],
+        max_tokens: Optional[int] = None,
+        timeout_seconds: Optional[float] = None,
+        *args,
+        **kwargs,
     ):
         """Send a chat completion query with OpenAI format to the vLLM server. Return the response content.
         Args:
@@ -58,7 +58,7 @@ class OpenAIAPI(LanguageModel):
             timeout_seconds: The timeout seconds.
         """
         if isinstance(message, str):
-            message = [{'role': 'user', 'content': message.strip()}]
+            message = [{"role": "user", "content": message.strip()}]
 
         response = self._client.chat.completions.create(
             model=self._model,

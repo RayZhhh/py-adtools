@@ -16,12 +16,12 @@ class LanguageModel:
 
     @abstractmethod
     def chat_completion(
-            self,
-            message: str | List[openai.types.chat.ChatCompletionMessageParam],
-            max_tokens: int,
-            timeout_seconds: float,
-            *args,
-            **kwargs
+        self,
+        message: str | List[openai.types.chat.ChatCompletionMessageParam],
+        max_tokens: int,
+        timeout_seconds: float,
+        *args,
+        **kwargs,
     ):
         """Send a chat completion query with OpenAI format to the vLLM server. Return the response content.
         Args:

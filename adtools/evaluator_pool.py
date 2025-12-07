@@ -15,10 +15,10 @@ from .py_code import PyProgram
 
 class EvaluatorExecutorPool:
     def __init__(
-            self,
-            evaluator: PyEvaluator,
-            max_workers: int,
-            pool_type: Literal['thread', 'process'] = 'thread'
+        self,
+        evaluator: PyEvaluator,
+        max_workers: int,
+        pool_type: Literal["thread", "process"] = "thread",
     ):
         """Multi-thread/process executor pool for parallel evaluation.
         Args:
@@ -28,7 +28,7 @@ class EvaluatorExecutorPool:
         """
         self.evaluator = evaluator
         self.max_workers = max_workers
-        if pool_type == 'thread':
+        if pool_type == "thread":
             self.pool = ThreadPoolExecutor(max_workers=self.max_workers)
         else:
             self.pool = ProcessPoolExecutor(max_workers=self.max_workers)
@@ -49,13 +49,15 @@ class EvaluatorExecutorPool:
             return res
 
     def secure_evaluate(
-            self,
-            program: str | PyProgram,
-            timeout_seconds: Optional[float],
-            redirect_to_devnull: bool = False,
-            multiprocessing_start_method: Literal['default', 'auto', 'fork', 'spawn'] = 'auto',
-            return_time=True,
-            **kwargs
+        self,
+        program: str | PyProgram,
+        timeout_seconds: Optional[float],
+        redirect_to_devnull: bool = False,
+        multiprocessing_start_method: Literal[
+            "default", "auto", "fork", "spawn"
+        ] = "auto",
+        return_time=True,
+        **kwargs,
     ):
         """Evaluate program in a new process. This enables timeout restriction and output redirection.
         Args:
@@ -78,7 +80,7 @@ class EvaluatorExecutorPool:
             redirect_to_devnull,
             multiprocessing_start_method,
             return_time,
-            **kwargs
+            **kwargs,
         )
         res = future.result()
         return res

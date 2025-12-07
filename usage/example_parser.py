@@ -1,6 +1,6 @@
 from adtools import PyProgram
 
-code = r'''
+code = r"""
 import ast, numba                 # This part will be parsed into PyCodeBlock
 import numpy as np
 
@@ -35,11 +35,11 @@ if __name__ == '__main__':        # This part will be parsed into PyCodeBlock
 	res = function(1)
 	print(res)
 	res = PythonClass().method2(1, 2)
-'''
+"""
 
 p = PyProgram.from_text(code)
 print(p)
-print(f'-------------------------------------')
+print(f"-------------------------------------")
 print(p.classes[0].functions[2].decorator)
-print(f'-------------------------------------')
+print(f"-------------------------------------")
 print(p.functions[0].name)
