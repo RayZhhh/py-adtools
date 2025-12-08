@@ -1,9 +1,9 @@
-try:  # fmt:no
+try:
     import ray
     from ray.exceptions import GetTimeoutError
     import os
 
-    os.environ["RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO"] = "0"  # fmt:yes
+    os.environ["RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO"] = "0"
 except ImportError:
     raise ImportError('Python package "ray" is not installed.')
 
