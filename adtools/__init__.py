@@ -1,7 +1,6 @@
-from .py_code import PyCodeBlock, PyFunction, PyClass, PyProgram
-from .evaluator import (
+from adtools.py_code import PyCodeBlock, PyFunction, PyClass, PyProgram
+from adtools.evaluator import (
     PyEvaluator,
     PyEvaluatorReturnInManagerDict,
     PyEvaluatorReturnInSharedMemory,
 )
-from .evaluator_pool import EvaluatorExecutorPool

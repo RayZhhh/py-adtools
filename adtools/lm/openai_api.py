@@ -10,7 +10,7 @@ from typing import List, Optional
 
 import openai.types.chat
 
-from .lm_base import LanguageModel
+from adtools.lm.lm_base import LanguageModel
 
 
 class OpenAIAPI(LanguageModel):
@@ -51,7 +51,9 @@ class OpenAIAPI(LanguageModel):
         *args,
         **kwargs,
     ):
-        """Send a chat completion query with OpenAI format to the vLLM server. Return the response content.
+        """Send a chat completion query with OpenAI format to the vLLM server.
+        Return the response content.
+
         Args:
             message: The message in str or openai format.
             max_tokens: The maximum number of tokens to generate.

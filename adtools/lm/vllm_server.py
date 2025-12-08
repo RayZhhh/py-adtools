@@ -25,7 +25,7 @@ import time
 
 import openai.types.chat
 
-from .lm_base import LanguageModel
+from adtools.lm.lm_base import LanguageModel
 
 
 def _print_cmd_list(cmd_list, gpus, host, port):
@@ -62,6 +62,7 @@ class VLLMServer(LanguageModel):
         chat_template_kwargs: Optional[Dict[str, Any]] = None,
     ):
         """Deploy an LLM on specified GPUs.
+
         Args:
             model_path: Path to the model to deploy.
             tokenizer_path: Path to the tokenizer to use.
@@ -270,6 +271,7 @@ class VLLMServer(LanguageModel):
         self, lora_name: str, new_adapter_path: str, num_trails: int = 5
     ):
         """Dynamically load a LoRA adapter.
+
         Args:
             lora_name: LoRA adapter name.
             new_adapter_path: Path to the new LoRA adapter weights.
@@ -327,7 +329,9 @@ class VLLMServer(LanguageModel):
         top_p: float = 0.9,
         chat_template_kwargs: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """Send a chat completion query with OpenAI format to the vLLM server. Return the response content.
+        """Send a chat completion query with OpenAI format to the vLLM server.
+        Return the response content.
+
         Args:
             message: The message in str or openai format.
             max_tokens: The maximum number of tokens to generate.

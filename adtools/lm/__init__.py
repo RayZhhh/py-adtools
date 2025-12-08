@@ -3,4 +3,4 @@ try:
 except ImportError:
     raise ImportError('Python package "openai" is not installed.')
 
-from .lm_base import LanguageModel
+from adtools.lm.lm_base import LanguageModel

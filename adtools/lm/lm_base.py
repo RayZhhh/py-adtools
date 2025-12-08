@@ -23,7 +23,9 @@ class LanguageModel:
         *args,
         **kwargs,
     ):
-        """Send a chat completion query with OpenAI format to the vLLM server. Return the response content.
+        """Send a chat completion query with OpenAI format to the vLLM server.
+        Return the response content.
+
         Args:
             message: The message in str or openai format.
             max_tokens: The maximum number of tokens to generate.
