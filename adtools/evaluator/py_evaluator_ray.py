@@ -22,8 +22,6 @@ class PyEvaluatorRay(PyEvaluator):
         self,
         exec_code: bool = True,
         debug_mode: bool = False,
-        *,
-        join_timeout_seconds: int = 10,
     ):
         """Evaluator using Ray for secure, isolated execution.
         It supports efficient zero-copy return of large objects (e.g., Tensors).
@@ -31,15 +29,10 @@ class PyEvaluatorRay(PyEvaluator):
         Args:
             exec_code: Whether to execute the code using 'exec()'.
             debug_mode: Enable debug print statements.
-            join_timeout_seconds: (Not primarily used in Ray logic, but kept for compatibility).
         """
-        # We set find_and_kill_children_evaluation_process to False because Ray
-        # manages the process tree, and we use ray.kill() to clean up
         super().__init__(
-            exec_code,
-            find_and_kill_children_evaluation_process=False,
+            exec_code=exec_code,
             debug_mode=debug_mode,
-            join_timeout_seconds=join_timeout_seconds,
         )
         # Initialize Ray if not already running
         if not ray.is_initialized():
