@@ -2,6 +2,7 @@ try:  # fmt:no
     import ray
     from ray.exceptions import GetTimeoutError
     import os
+
     os.environ["RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO"] = "0"  # fmt:yes
 except ImportError:
     raise ImportError('Python package "ray" is not installed.')
@@ -15,6 +16,9 @@ from typing import Any, Tuple, Dict, List, Callable
 from adtools.py_code import PyProgram
 from adtools.evaluator.py_evaluator import PyEvaluator
 from adtools.evaluator.utils import _redirect_to_devnull
+
+
+__all__ = ["PyEvaluatorRay"]
 
 
 class PyEvaluatorRay(PyEvaluator):
