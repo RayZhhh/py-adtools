@@ -1,4 +1,4 @@
-# Useful tools for parsing and evaluating Python programs for algorithm design
+# Useful tools for parsing and evaluating Python programs for algorithm design/code optimization
 
 ------
 
