@@ -8,3 +8,4 @@ py_adtools.egg-info
 remove_files.sh
 _ignore_files
 .gitignore
+debug

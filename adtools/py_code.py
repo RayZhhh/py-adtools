@@ -413,22 +413,3 @@ class _ProgramVisitor(ast.NodeVisitor):
             classes=self._classes,
             elements=self._elements,
         )
-
-
-def smart_indent(text: str, prefix: str = "    ") -> str:
-    """Indents text using `textwrap.indent`, but detects if the text is already indented.
-
-    If the first line already starts with whitespace, it assumes the indentation
-    was intentionally preserved during extraction (to handle complex multi-line strings)
-    and prevents double-indentation.
-    """
-    if not text:
-        return text
-
-    # Check if the first line is already indented (starts with space or tab).
-    # We only check the first line because that determines the block's alignment.
-    first_line = text.split("\n")[0]
-    if first_line.startswith(" ") or first_line.startswith("\t"):
-        return text
-
-    return textwrap.indent(text, prefix)

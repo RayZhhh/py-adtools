@@ -26,7 +26,8 @@ class PythonClass(BaseClass):
     @some.decorators()
     def method2(self, x, y):
     	return x + y + self.method1(x)
-
+    
+    @some.decorators(100)  
     class InnerClass:             # This part will be parsed into PyCodeBlock
     	def __init__(self):       # and placed in PyClass.body
     		...
@@ -37,7 +38,7 @@ if __name__ == '__main__':        # This part will be parsed into PyCodeBlock
 	res = PythonClass().method2(1, 2)
 """
 
-p = PyProgram.from_text(code)
+p = PyProgram.from_text(code, debug=True)
 print(p)
 print(f"-------------------------------------")
 print(p.classes[0].functions[2].decorator)
