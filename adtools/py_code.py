@@ -8,6 +8,7 @@ Commercial use of this software or its derivatives requires prior written permis
 import ast
 import dataclasses
 import textwrap
+import traceback
 from typing import List, Optional, Union
 
 __all__ = ["PyCodeBlock", "PyFunction", "PyClass", "PyProgram"]
@@ -56,7 +57,7 @@ class PyFunction:
 
         # The body is expected to be already indented (if parsed correctly).
         # We ensure it is indented relative to the function definition.
-        function_def += textwrap.indent(self.body, "    ")
+        function_def += self.body
         return function_def
 
     def __repr__(self) -> str:
@@ -187,17 +188,16 @@ class PyProgram:
         return program.strip()
 
     @classmethod
-    def from_text(cls, text: str) -> Optional["PyProgram"]:
+    def from_text(cls, text: str, debug=False) -> Optional["PyProgram"]:
         """Parses text into a PyProgram object. Returns None on syntax errors."""
         try:
             tree = ast.parse(text)
             visitor = _ProgramVisitor(text)
             visitor.visit(tree)
             return visitor.return_program()
-        except SyntaxError:
-            return None
-        except Exception as e:
-            print(f"Error parsing program: {e}")
+        except:
+            if debug:
+                raise
             return None
 
 
@@ -214,18 +214,33 @@ class _ProgramVisitor(ast.NodeVisitor):
         self._elements: List[Union[PyFunction, PyClass, PyCodeBlock]] = []
         self._last_script_end = 0
 
-    def _get_code(self, start_line: int, end_line: int, dedent: bool = False) -> str:
-        """Get code between start_line and end_line."""
+    def _get_code(self, start_line: int, end_line: int, remove_indent: int = 0) -> str:
+        """Get code between start_line and end_line.
+
+        Args:
+            remove_indent: The number of spaces to strip from the beginning of each line.
+                his corresponds to the column offset of the function definition.
+        """
         if start_line >= end_line:
             return ""
 
         lines = self._codelines[start_line:end_line]
-        code = "\n".join(lines)
 
-        if dedent:
-            return textwrap.dedent(code).rstrip()
+        if remove_indent > 0:
+            dedented_lines = []
+            for line in lines:
+                # We only strip indentation if the line is long enough.
+                # If a line inside a multiline string is shorter/unindented (e.g., column 0),
+                # we keep it as is.
+                if len(line) >= remove_indent and line[:remove_indent].isspace():
+                    dedented_lines.append(line[remove_indent:])
+                else:
+                    dedented_lines.append(line)
+            return "\n".join(dedented_lines).rstrip()
         else:
-            return code.rstrip()
+            # For top-level functions (remove_indent=0), we return the raw code.
+            # This perfectly preserves the structure of multiline strings with 0 indentation.
+            return "\n".join(lines).rstrip()
 
     def _add_script_segment(self, start_line: int, end_line: int):
         """Add a script segment (gap between functions/classes) from the code."""
@@ -244,7 +259,9 @@ class _ProgramVisitor(ast.NodeVisitor):
         # Extract decorators
         if hasattr(node, "decorator_list") and node.decorator_list:
             dec_start = min(d.lineno for d in node.decorator_list)
-            decorator = self._get_code(dec_start - 1, node.lineno - 1, dedent=True)
+            decorator = self._get_code(
+                dec_start - 1, node.lineno - 1, remove_indent=node.col_offset
+            )
         else:
             decorator = None
 
@@ -260,8 +277,12 @@ class _ProgramVisitor(ast.NodeVisitor):
         else:
             body_start_line = node.body[0].lineno - 1
 
-        # Extract body
-        body = self._get_code(body_start_line, node.end_lineno, dedent=True)
+        # Extract body, and APPLY CRITICAL INDENTATION:
+        #   - Top-level functions (col_offset=0) -> Body is NOT modified
+        #   - Class methods (col_offset=4) -> Body loses exactly 4 spaces (the class indent)
+        body = self._get_code(
+            body_start_line, node.end_lineno, remove_indent=node.col_offset
+        )
         is_async = isinstance(node, ast.AsyncFunctionDef)
 
         return PyFunction(
@@ -346,7 +367,7 @@ class _ProgramVisitor(ast.NodeVisitor):
 
                 # Capture Gaps (Use item_start_line instead of item.lineno)
                 gap_code = self._get_code(
-                    last_inner_end, item_start_line - 1, dedent=True
+                    last_inner_end, item_start_line - 1, remove_indent=item.col_offset
                 ).strip()
                 if gap_code:
                     gap_block = PyCodeBlock(code=gap_code)
@@ -360,7 +381,7 @@ class _ProgramVisitor(ast.NodeVisitor):
                     class_body.append(method_func)
                 else:
                     code_text = self._get_code(
-                        item.lineno - 1, item.end_lineno, dedent=True
+                        item.lineno - 1, item.end_lineno, remove_indent=item.col_offset
                     )
                     block = PyCodeBlock(code=code_text)
                     statements.append(block)
@@ -392,3 +413,22 @@ class _ProgramVisitor(ast.NodeVisitor):
             classes=self._classes,
             elements=self._elements,
         )
+
+
+def smart_indent(text: str, prefix: str = "    ") -> str:
+    """Indents text using `textwrap.indent`, but detects if the text is already indented.
+
+    If the first line already starts with whitespace, it assumes the indentation
+    was intentionally preserved during extraction (to handle complex multi-line strings)
+    and prevents double-indentation.
+    """
+    if not text:
+        return text
+
+    # Check if the first line is already indented (starts with space or tab).
+    # We only check the first line because that determines the block's alignment.
+    first_line = text.split("\n")[0]
+    if first_line.startswith(" ") or first_line.startswith("\t"):
+        return text
+
+    return textwrap.indent(text, prefix)
