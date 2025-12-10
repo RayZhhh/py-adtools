@@ -119,7 +119,18 @@ class PyEvaluatorRay(PyEvaluator):
         callable_classes_list: List[Callable] | None,
         **kwargs,
     ) -> Any:
-        """Evaluate a given program."""
+        """Evaluate a given program.
+
+        Args:
+            program_str: The raw program text.
+            callable_functions_dict: A dict maps function name to callable function.
+            callable_functions_list: A list of callable functions.
+            callable_classes_dict: A dict maps class name to callable class.
+            callable_classes_list: A list of callable classes.
+
+        Returns:
+            Returns the evaluation result.
+        """
         raise NotImplementedError(
             "Must provide an evaluator for a python program. "
             "Override this method in a subclass."
