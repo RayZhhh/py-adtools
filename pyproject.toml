@@ -21,6 +21,7 @@ classifiers = [
 dependencies = [
     "psutil",
     "openai",
+    "ray"
 ]
 
 [project.urls]
