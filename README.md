@@ -174,7 +174,7 @@ if __name__ == '__main__':
     evaluator = SortAlgorithmEvaluator()
 
     # Evaluate
-    score = evaluator.evaluate(code_generated_by_llm)
+    score = evaluator._exec_and_get_res(code_generated_by_llm)
     print(f'Score: {score}')
 
     # Secure evaluate (the evaluation is executed in a sandbox process)
