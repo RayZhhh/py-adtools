@@ -23,7 +23,7 @@ import uuid
 from abc import ABC, abstractmethod
 from multiprocessing import shared_memory
 from queue import Empty
-from typing import Any, Literal, Dict, Callable, List, Tuple
+from typing import Any, Literal, Dict, Callable, List, Tuple, TypedDict
 import multiprocessing.managers
 import psutil
 import traceback
@@ -32,10 +32,17 @@ from adtools.py_code import PyProgram
 from adtools.evaluator.utils import _redirect_to_devnull, _set_mp_start_method
 
 __all__ = [
+    "EvaluationResults",
     "PyEvaluator",
     "PyEvaluatorReturnInManagerDict",
     "PyEvaluatorReturnInSharedMemory",
 ]
+
+
+class EvaluationResults(TypedDict):
+    result: Any
+    evaluate_time: float
+    error_msg: str
 
 
 class PyEvaluator(ABC):
@@ -117,7 +124,7 @@ class PyEvaluator(ABC):
                 print(f"Killing process {process.pid}'s children process {child.pid}")
             child.terminate()
 
-    def evaluate(self, program: str | PyProgram, **kwargs):
+    def _exec_and_get_res(self, program: str | PyProgram, **kwargs):
         """Evaluate a program.
 
         Args:
@@ -164,6 +171,19 @@ class PyEvaluator(ABC):
         )
         return res
 
+    def evaluate(self, program: str | PyProgram, **kwargs) -> EvaluationResults:
+        start_time = time.time()
+        error_msg = ""
+        try:
+            res = self._exec_and_get_res(program, **kwargs)
+        except:
+            res = None
+            error_msg = str(traceback.format_exc())
+
+        return EvaluationResults(
+            result=res, evaluate_time=time.time() - start_time, error_msg=error_msg
+        )
+
     def _evaluate_in_safe_process(
         self,
         program_str: str,
@@ -177,11 +197,12 @@ class PyEvaluator(ABC):
         # Evaluate and get results
         try:
             # Evaluate and put the results to the queue
-            res = self.evaluate(program_str, **kwargs)
-            result_queue.put(res)
+            res = self._exec_and_get_res(program_str, **kwargs)
+            result_queue.put((res, ""))
         except:
-            traceback.print_exc()
-            result_queue.put(None)
+            if not self.debug_mode:
+                traceback.print_exc()
+            result_queue.put((None, str(traceback.format_exc())))
 
     def secure_evaluate(
         self,
@@ -190,10 +211,9 @@ class PyEvaluator(ABC):
         redirect_to_devnull: bool = False,
         multiprocessing_start_method: Literal[
             "default", "auto", "fork", "spawn"
-        ] = "auto",
-        get_evaluate_time=False,
+        ] = "default",
         **kwargs,
-    ) -> Any | Tuple[Any, float]:
+    ) -> EvaluationResults:
         """Evaluate program in a new process. This enables timeout restriction and output redirection.
 
         Args:
@@ -203,7 +223,6 @@ class PyEvaluator(ABC):
             multiprocessing_start_method: start a process using 'fork' or 'spawn'. If set to 'auto',
                 the process will be started using 'fork' with Linux/macOS and 'spawn' with Windows.
                 If set to 'default', there will be no changes to system default.
-            get_evaluate_time: get evaluation time for this program.
             **kwargs: additional keyword arguments to pass to 'evaluate_program'.
 
         Returns:
@@ -220,36 +239,36 @@ class PyEvaluator(ABC):
                 args=(str(program), result_queue, redirect_to_devnull),
                 kwargs=kwargs,
             )
-            evaluate_start_time = time.time()
             process.start()
+            evaluate_start_time = time.time()
 
             try:
                 # Get the result in timeout seconds
-                result = result_queue.get(timeout=timeout_seconds)
-                # Calculate the evaluate time
-                eval_time = time.time() - evaluate_start_time
-                # After getting the result, terminate and kill the process
-                self._kill_process_and_its_children(process)
+                result, error_msg = result_queue.get(timeout=timeout_seconds)
             except Empty:
-                # The queue is empty indicates a timeout
                 if self.debug_mode:
                     print(f"DEBUG: the evaluation time exceeds {timeout_seconds}s.")
-                result = None
-            except Exception as e:
-                if self.debug_mode:
-                    print(f"DEBUG: evaluation failed with exception:\n{traceback.format_exc()}")  # fmt:skip
-                result = None
-            finally:
-                # Calculate the evaluate time
-                eval_time = time.time() - evaluate_start_time
-                # Terminate and kill all processes if timeout happens
-                self._kill_process_and_its_children(process)
+                result, error_msg = None, "Evaluation timeout."
 
-            return (result, eval_time) if get_evaluate_time else result
-        except Exception as e:
+            # Evaluation timeout happens, we return 'None' as well as the actual evaluate time
+            return EvaluationResults(
+                result=result,
+                evaluate_time=time.time() - evaluate_start_time,
+                error_msg=error_msg,
+            )
+        except:
+            error_msg = str(traceback.format_exc())
             if self.debug_mode:
                 traceback.print_exc()
-            return None
+
+            return EvaluationResults(
+                result=None,
+                evaluate_time=time.time() - evaluate_start_time,
+                error_msg=error_msg,
+            )
+        finally:
+            # Terminate and kill all processes if timeout happens
+            self._kill_process_and_its_children(process)
 
 
 class PyEvaluatorReturnInManagerDict(PyEvaluator):
@@ -313,18 +332,18 @@ class PyEvaluatorReturnInManagerDict(PyEvaluator):
         # Evaluate and get results
         try:
             # Evaluate and get results
-            res = self.evaluate(program_str, **kwargs)
+            res = self._exec_and_get_res(program_str, **kwargs)
             # Write results into dict
             result_dict["result"] = res
             # Put a signal to queue to inform the parent process the evaluation has done
-            signal_queue.put(("ok", None))
+            signal_queue.put((True, ""))
         except Exception as e:
             if self.debug_mode:
                 traceback.print_exc()
             # Write results into dict
             result_dict["result"] = None
             # Put a signal to queue to inform the parent process the evaluation has terminated
-            signal_queue.put(("error", str(e)))
+            signal_queue.put((False, str(traceback.format_exc())))
 
     def secure_evaluate(
         self,
@@ -333,8 +352,7 @@ class PyEvaluatorReturnInManagerDict(PyEvaluator):
         redirect_to_devnull: bool = False,
         multiprocessing_start_method: Literal[
             "default", "auto", "fork", "spawn"
-        ] = "auto",
-        get_evaluate_time: bool = False,
+        ] = "default",
         **kwargs,
     ):
         """Evaluate program in a new process. This enables timeout restriction and output redirection.
@@ -346,7 +364,6 @@ class PyEvaluatorReturnInManagerDict(PyEvaluator):
             multiprocessing_start_method: start a process using 'fork' or 'spawn'. If set to 'auto',
                 the process will be started using 'fork' with Linux/macOS and 'spawn' with Windows.
                 If set to 'default', there will be no changes to system default.
-            get_evaluate_time: get evaluation time for this program.
             **kwargs: additional keyword arguments to pass to 'evaluate_program'.
 
         Returns:
@@ -373,39 +390,46 @@ class PyEvaluatorReturnInManagerDict(PyEvaluator):
                 try:
                     # If there is timeout restriction, we try to get results before timeout
                     signal = signal_queue.get(timeout=timeout_seconds)
-                except Empty:
-                    # Evaluation timeout happens, we return 'None' as well as the actual evaluate time
+                    # Calculate evaluation time and kill children processes
                     eval_time = time.time() - evaluate_start_time
+                except Empty:
                     if self.debug_mode:
                         print(f"DEBUG: evaluation time exceeds {timeout_seconds}s.")
-                    # Terminate and kill all processes after evaluation
-                    self._kill_process_and_its_children(process)
-                    return (None, eval_time) if get_evaluate_time else None
 
-                # Calculate evaluation time and kill children processes
-                eval_time = time.time() - evaluate_start_time
-                # Terminate and kill all processes after evaluation
-                self._kill_process_and_its_children(process)
+                    # Evaluation timeout happens, we return 'None' as well as the actual evaluate time
+                    return EvaluationResults(
+                        result=None,
+                        evaluate_time=time.time() - evaluate_start_time,
+                        error_msg="Evaluation timeout.",
+                    )
 
-                # The first element is 'ok' indicates that the evaluation terminate without exceptions
-                if signal[0] == "ok":
+                # The first element is True indicates that the evaluation terminate without exceptions
+                if signal[0] is True:
                     # We get the evaluation results from 'manager.dict'
                     result = result_dict.get("result", None)
+                    error_msg = ""
                 else:
                     # The evaluation failed for some reason, so we set the result to 'None'
-                    if self.debug_mode:
-                        print(f"DEBUG: child process error: {signal[1]}")
+                    error_msg = signal[1]
                     result = None
+
+                return EvaluationResults(
+                    result=result,
+                    evaluate_time=eval_time,
+                    error_msg=error_msg,
+                )
             except:
-                # If there is any exception during above procedure, we set the result to None
-                eval_time = time.time() - evaluate_start_time
                 if self.debug_mode:
                     print( f"DEBUG: exception in manager evaluate:\n{traceback.format_exc()}")  # fmt:skip
+
+                return EvaluationResults(
+                    result=None,
+                    evaluate_time=time.time() - evaluate_start_time,
+                    error_msg=str(traceback.format_exc()),
+                )
+            finally:
                 # Terminate and kill all processes after evaluation
                 self._kill_process_and_its_children(process)
-                result = None
-
-        return (result, eval_time) if get_evaluate_time else result
 
 
 class PyEvaluatorReturnInSharedMemory(PyEvaluator):
@@ -482,7 +506,7 @@ class PyEvaluatorReturnInSharedMemory(PyEvaluator):
             _redirect_to_devnull()
         # Evaluate and get results
         try:
-            res = self.evaluate(program_str, **kwargs)
+            res = self._exec_and_get_res(program_str, **kwargs)
             # Dump the results to data
             data = pickle.dumps(res, protocol=pickle.HIGHEST_PROTOCOL)
             # Create shared memory using the ID provided by the parent
@@ -497,20 +521,23 @@ class PyEvaluatorReturnInSharedMemory(PyEvaluator):
             meta_queue.put((True, len(data)))
             # Child closes its handle
             shm.close()
-        except Exception as data_pickle_error:
+        except Exception:
+            if self.debug_mode:
+                traceback.print_exc()
             # Put the exception message to the queue
             # Sending (False, error_message) to indicate failure.
-            meta_queue.put((False, str(data_pickle_error)))
+            meta_queue.put((False, str(traceback.format_exc())))
 
     def secure_evaluate(
         self,
         program: str | PyProgram,  # Assuming PyProgram is defined
         timeout_seconds: int | float = None,
         redirect_to_devnull: bool = False,
-        multiprocessing_start_method: str = "auto",
-        get_evaluate_time: bool = False,
+        multiprocessing_start_method: Literal[
+            "default", "auto", "fork", "spawn"
+        ] = "default",
         **kwargs,
-    ):
+    ) -> EvaluationResults:
         """Evaluate program in a new process. This enables timeout restriction and output redirection.
 
         Args:
@@ -520,7 +547,6 @@ class PyEvaluatorReturnInSharedMemory(PyEvaluator):
             multiprocessing_start_method: start a process using 'fork' or 'spawn'. If set to 'auto',
                 the process will be started using 'fork' with Linux/macOS and 'spawn' with Windows.
                 If set to 'default', there will be no changes to system default.
-            get_evaluate_time: get evaluation time for this program.
             **kwargs: additional keyword arguments to pass to 'evaluate_program'.
 
         Returns:
@@ -544,56 +570,55 @@ class PyEvaluatorReturnInSharedMemory(PyEvaluator):
             )
             evaluate_start_time = time.time()
             process.start()
-            result = None
 
             try:
                 # Try to get the metadata before timeout
                 meta = meta_queue.get(timeout=timeout_seconds)
-            except Empty:
-                # Evaluate timeout
+                # Calculate evaluation time
                 eval_time = time.time() - evaluate_start_time
+            except Empty:
                 if self.debug_mode:
                     print(f"DEBUG: evaluation time exceeds {timeout_seconds}s.")
-                self._kill_process_and_its_children(process)
-                # Directly return here, the 'finally' block will handle cleanup
-                return (None, eval_time) if get_evaluate_time else None
 
-            # Calculate evaluation time
-            eval_time = time.time() - evaluate_start_time
-            self._kill_process_and_its_children(process)
+                # Evaluation timeout happens, we return 'None' as well as the actual evaluate time
+                return EvaluationResults(
+                    result=None,
+                    evaluate_time=time.time() - evaluate_start_time,
+                    error_msg="Evaluation timeout.",
+                )
 
             # The 'meta' is now (Success_Flag, Data_Size_or_Error_Msg)
             success, payload = meta
 
             if not success:
                 # Payload is the error message
-                if self.debug_mode:
-                    print(f"DEBUG: shared memory failed with exception: {payload}")
+                error_msg = payload
                 result = None
             else:
+                error_msg = ""
                 # Payload is the size of the data
                 size = payload
                 # Attach to the existing shared memory by name
-                try:
-                    shm = shared_memory.SharedMemory(name=unique_shm_name)
-                    buf = bytes(shm.buf[:size])
-                    # Load results from buffer
-                    result = pickle.loads(buf)
-                    shm.close()
-                    # We do NOT unlink here immediately; we let the finally block handle it
-                    # to avoid code duplication, although unlinking here is also valid.
-                except FileNotFoundError:
-                    # Rare race condition or error
-                    result = None
+                shm = shared_memory.SharedMemory(name=unique_shm_name)
+                buf = bytes(shm.buf[:size])
+                # Load results from buffer
+                result = pickle.loads(buf)
+                shm.close()
 
+            return EvaluationResults(
+                result=result, evaluate_time=eval_time, error_msg=error_msg
+            )
         except Exception:
-            eval_time = time.time() - evaluate_start_time
             if self.debug_mode:
                 print(f"DEBUG: exception in shared evaluate:\n{traceback.format_exc()}")
-            self._kill_process_and_its_children(process)
-            result = None
 
+            return EvaluationResults(
+                result=None,
+                evaluate_time=time.time() - evaluate_start_time,
+                error_msg=str(traceback.format_exc()),
+            )
         finally:
+            self._kill_process_and_its_children(process)
             # Critical Cleanup: Ensure the shared memory is unlinked from the OS
             # This runs whether the process finished, timed out, or crashed
             try:
@@ -606,8 +631,3 @@ class PyEvaluatorReturnInSharedMemory(PyEvaluator):
                 # This is normal if the child process never reached the creation step
                 # (e.g. crashed during calculation before creating SHM)
                 pass
-            except Exception as e:
-                if self.debug_mode:
-                    print(f"DEBUG: Error cleaning up shared memory: {e}")
-
-        return (result, eval_time) if get_evaluate_time else result

@@ -1,20 +1,12 @@
-try:
-    import ray
-    from ray.exceptions import GetTimeoutError
-    import os
-
-    os.environ["RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO"] = "0"
-except ImportError:
-    raise ImportError('Python package "ray" is not installed.')
-
-from abc import abstractmethod
+import logging
+import os
 import time
 import traceback
-
+from abc import abstractmethod
 from typing import Any, Tuple, Dict, List, Callable
 
 from adtools.py_code import PyProgram
-from adtools.evaluator.py_evaluator import PyEvaluator
+from adtools.evaluator.py_evaluator import PyEvaluator, EvaluationResults
 from adtools.evaluator.utils import _redirect_to_devnull
 
 
@@ -38,9 +30,21 @@ class PyEvaluatorRay(PyEvaluator):
             exec_code=exec_code,
             debug_mode=debug_mode,
         )
+
+        # Lazy Import Start
+        import ray
+
+        # Set environment variable before Ray initialization (moved from top-level)
+        os.environ["RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO"] = "0"
+
         # Initialize Ray if not already running
         if not ray.is_initialized():
-            ray.init(ignore_reinit_error=True)
+            ray.init(
+                ignore_reinit_error=True,
+                include_dashboard=False,
+                logging_level=logging.ERROR,
+                log_to_driver=False,
+            )
 
     def secure_evaluate(
         self,
@@ -50,28 +54,23 @@ class PyEvaluatorRay(PyEvaluator):
         get_evaluate_time: bool = False,
         ray_worker_options: dict[str, Any] = None,
         **kwargs,
-    ) -> Any | Tuple[Any, float]:
-        """Evaluates the program in a separate Ray Actor (process).
+    ) -> EvaluationResults:
+        """Evaluates the program in a separate Ray Actor (process)."""
+        # Lazy Import for Execution
+        import ray
+        from ray.exceptions import GetTimeoutError  # fmt:skip
 
-        Args:
-            program: the program to be evaluated.
-            timeout_seconds: return 'None' if the execution time exceeds 'timeout_seconds'.
-            redirect_to_devnull: redirect any output to '/dev/null'.
-            get_evaluate_time: get evaluation time for this program.
-            ray_worker_options: options to pass to ray.option(), e.g., dict(num_cpus1, num_gpus=4)
-            **kwargs: additional keyword arguments to pass to 'evaluate_program'.
-
-        Mechanism:
-            1. Spawns a new Ray Actor (Worker).
-            2. Sends 'self' (the evaluator) and the code to the Worker.
-            3. Waits for the result with a timeout.
-            4. Kills the Worker immediately to ensure a clean slate and resource release.
-        """
         # Convert PyProgram to string if necessary
         program_str = str(program)
+
         # Create a new Ray Actor (Sandbox)
-        # Create a fresh actor for every evaluation to ensure total isolation
-        worker = _RayWorker.options(**(ray_worker_options or {})).remote()
+        # Since we cannot use @ray.remote at the top level (ray is not imported yet),
+        # we dynamically convert the class to a remote actor here.
+        RemoteWorkerClass = ray.remote(max_concurrency=1)(_RayWorker)
+
+        # Create the worker instance
+        worker = RemoteWorkerClass.options(**(ray_worker_options or {})).remote()
+
         start_time = time.time()
         try:
             # Execute asynchronously
@@ -82,25 +81,33 @@ class PyEvaluatorRay(PyEvaluator):
             )
             # Wait for result with timeout
             result = ray.get(future, timeout=timeout_seconds)
-
+            return EvaluationResults(
+                result=result,
+                evaluate_time=time.time() - start_time,
+                error_msg="",
+            )
         except GetTimeoutError:
-            # Handle Timeout
             if self.debug_mode:
                 print(f"DEBUG: Ray evaluation timed out after {timeout_seconds}s.")
-            result = None
-        except Exception as e:
+            return EvaluationResults(
+                result=None,
+                evaluate_time=time.time() - start_time,
+                error_msg="Evaluation timeout.",
+            )
+        except:
             # Handle other runtime exceptions (syntax errors, runtime errors in code)
             if self.debug_mode:
                 print(f"DEBUG: Ray evaluation exception:\n{traceback.format_exc()}")
-            result = None
+            return EvaluationResults(
+                result=None,
+                evaluate_time=time.time() - start_time,
+                error_msg=str(traceback.format_exc()),
+            )
         finally:
             # Cleanup: Force kill the actor
             # 'no_restart=True' ensures Ray does not try to respawn this worker
             # This releases the resources (CPUs/GPUs) immediately
             ray.kill(worker, no_restart=True)
-            eval_time = time.time() - start_time
-
-        return (result, eval_time) if get_evaluate_time else result
 
     @abstractmethod
     def evaluate_program(
@@ -112,24 +119,13 @@ class PyEvaluatorRay(PyEvaluator):
         callable_classes_list: List[Callable] | None,
         **kwargs,
     ) -> Any:
-        """Evaluate a given program.
-
-        Args:
-            program_str: The raw program text.
-            callable_functions_dict: A dict maps function name to callable function.
-            callable_functions_list: A list of callable functions.
-            callable_classes_dict: A dict maps class name to callable class.
-            callable_classes_list: A list of callable classes.
-        Returns:
-            Returns the evaluation result.
-        """
+        """Evaluate a given program."""
         raise NotImplementedError(
             "Must provide an evaluator for a python program. "
             "Override this method in a subclass."
         )
 
 
-@ray.remote(max_concurrency=1)  # noqa
 class _RayWorker:
     """A standalone Ray Actor used to execute the evaluation logic in a separate process."""
 
@@ -140,23 +136,11 @@ class _RayWorker:
         redirect_to_devnull: bool,
         **kwargs,
     ) -> Any:
-        """Executes the evaluation inside the remote Ray process.
-
-        Args:
-            evaluator_instance: The evaluator object (pickled and sent to this worker).
-            program_str: The code to evaluate.
-            redirect_to_devnull: Whether to silence stdout/stderr.
-            **kwargs: Arguments passed to evaluate_program.
-        """
+        """Executes the evaluation inside the remote Ray process."""
         if redirect_to_devnull:
             _redirect_to_devnull()
 
-        try:
-            # Invoke the parent class's evaluate method
-            return evaluator_instance.evaluate(program_str, **kwargs)
-        except Exception:
-            # Re-raise to let Ray handle the exception
-            raise
+        return evaluator_instance._exec_and_get_res(program_str, **kwargs)
 
 
 if __name__ == "__main__":
@@ -171,16 +155,7 @@ if __name__ == "__main__":
             callable_classes_list: List[Callable] | None,
             **kwargs,
         ) -> Any | None:
-            """Evaluate a given sort algorithm program.
-            Args:
-                program_str            : The raw program text.
-                callable_functions_dict: A dict maps function name to callable function.
-                callable_functions_list: A list of callable functions.
-                callable_classes_dict  : A dict maps class name to callable class.
-                callable_classes_list  : A list of callable classes.
-            Return:
-                Returns the evaluation result.
-            """
+            """Evaluate a given sort algorithm program."""
             # Get the sort algorithm
             sort_algo: Callable = callable_functions_dict["merge_sort"]
             # Test data
@@ -235,7 +210,7 @@ def merge_sort(arr):
     evaluator = SortAlgorithmEvaluator(debug_mode=True)
 
     # Evaluate
-    score = evaluator.evaluate(code_generated_by_llm)
+    score = evaluator._exec_and_get_res(code_generated_by_llm)
     print(f"Score: {score}")
 
     # Secure evaluate (the evaluation is executed in a sandbox process)
