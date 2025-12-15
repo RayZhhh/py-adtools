@@ -13,6 +13,7 @@ def function(arg1, arg2=True):
 
 @some.decorators()                # This part will be parsed into PyClass
 class PythonClass(BaseClass):
+    '''Docstring.'''
     # Comments
     class_var1 = 1                # This part will be parsed into PyCodeBlock
     class_var2 = 2                # and placed in PyClass.body
@@ -29,8 +30,9 @@ class PythonClass(BaseClass):
     
     @some.decorators(100)  
     class InnerClass:             # This part will be parsed into PyCodeBlock
-    	def __init__(self):       # and placed in PyClass.body
-    		...
+        '''Docstring.'''
+        def __init__(self):       # and placed in PyClass.body
+            ...
 
 if __name__ == '__main__':        # This part will be parsed into PyCodeBlock
 	res = function(1)
