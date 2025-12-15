@@ -211,34 +211,30 @@ def _smart_indent(code: str, indent_str: str) -> str:
     lines = code.splitlines()
     string_lines = set()
 
-    try:
-        # Identify lines belonging to multiline strings
-        tokens = tokenize.tokenize(BytesIO(code.encode("utf-8")).readline)
-        for token in tokens:
-            if token.type == tokenize.STRING:
-                start_line, _ = token.start
-                end_line, _ = token.end
+    # Identify lines belonging to multiline strings
+    tokens = tokenize.tokenize(BytesIO(code.encode("utf-8")).readline)
+    for token in tokens:
+        if token.type == tokenize.STRING:
+            start_line, _ = token.start
+            end_line, _ = token.end
 
-                # If it is a multiline string
-                if end_line > start_line:
-                    # We protect the content (start+1 to end).
-                    # We also protect the end_line because usually the closing quotes
-                    # are already positioned correctly in the source string.
-                    for i in range(start_line + 1, end_line + 1):
-                        string_lines.add(i)
-    except Exception:
-        # Fallback: if tokenization fails, we can't safely detect strings
-        traceback.print_exc()
+            # If it is a multiline string
+            if end_line > start_line:
+                # We protect the content (start+1 to end)
+                # We also protect the end_line because usually the closing quotes
+                # are already positioned correctly in the source string
+                for i in range(start_line + 1, end_line + 1):
+                    string_lines.add(i)
 
     result = []
     for i, line in enumerate(lines):
         lineno = i + 1
-        # If the line is inside a multiline string, append it as-is (no indent).
+        # If the line is inside a multiline string, append it as-is (no indent)
         if lineno in string_lines:
             result.append(line)
         else:
-            # Otherwise, apply indentation.
-            # We strip whitespace to avoid indenting empty lines (mimicking textwrap behavior).
+            # Otherwise, apply indentation
+            # We strip whitespace to avoid indenting empty lines (mimicking textwrap behavior)
             if line.strip():
                 result.append(indent_str + line)
             else:
@@ -308,31 +304,18 @@ class _ProgramVisitor(ast.NodeVisitor):
 
         if remove_indent > 0:
             dedented_lines = []
-            indent_str = " " * remove_indent
 
             for idx, line in enumerate(lines):
                 # Calculate the 1-based line number in the original source file
                 current_lineno = start_line + idx + 1
 
-                # Check if the current line is inside a multiline string
-                is_in_string = current_lineno in self._multiline_string_lines
-
-                if is_in_string:
-                    # STRICT DEDENT LOGIC for strings:
-                    # If we are inside a multiline string, we only strip indentation
-                    # if the line strictly starts with the expected block indentation.
-                    # This prevents stripping spaces from lines that have fewer spaces
-                    # than the block indentation (e.g., lines starting at col 0).
-                    if line.startswith(indent_str):
-                        dedented_lines.append(line[remove_indent:])
-                    else:
-                        # If the line does not start with the block indent (e.g., it is
-                        # to the left of the code block), we preserve it exactly as is.
-                        dedented_lines.append(line)
+                if current_lineno in self._multiline_string_lines:
+                    # Check if the current line is inside a multiline string
+                    # If the line is in the multiline string, we preserve it exactly as is
+                    dedented_lines.append(line)
                 else:
-                    # STANDARD LOGIC for code:
                     # For normal code, we allow stripping if the line is empty (isspace),
-                    # even if it doesn't have the full indentation length.
+                    # even if it doesn't have the full indentation length
                     if len(line) >= remove_indent and line[:remove_indent].isspace():
                         dedented_lines.append(line[remove_indent:])
                     else:
