@@ -196,11 +196,11 @@ if __name__ == '__main__':
 
 `adtools` provides four different evaluator implementations, each optimized for different scenarios:
 
-- **[PyEvaluator](./adtools/evaluator/py_evaluator.py#L47-L270)**
+- **[PyEvaluator](./adtools/evaluator/py_evaluator.py#L47-L270) (Recommend)**
   - *Basic evaluator* that executes code directly in the current process
-  - *Simplest to use* but lacks isolation from main process
-  - *Best for trusted code* with no risk of infinite loops or crashes
-  - *Use case*: Quick local testing of known-safe code
+  - *Provides process isolation* with timeout capabilities
+  - *Best for trusted code* with samll return objects (e.g., int, float)
+  - *Use case*: Evaluating heuristics with small return objects
 
 - **[PyEvaluatorReturnInManagerDict](./adtools/evaluator/py_evaluator.py#L273-L431)**
   - *Uses Manager().dict()* to handle large return objects
@@ -208,13 +208,13 @@ if __name__ == '__main__':
   - *Ideal for medium-sized results* where pickle serialization is acceptable
   - *Use case*: Evaluating code that returns moderately large data structures
 
-- **[PyEvaluatorReturnInSharedMemory](./adtools/evaluator/py_evaluator.py#L434-L632)**
+- **[PyEvaluatorReturnInSharedMemory](./adtools/evaluator/py_evaluator.py#L434-L632) (Recommend)**
   - *Uses shared memory* for extremely large return objects (e.g., large tensors)
   - *Avoids pickle serialization overhead* for massive data
   - *Best for high-performance scenarios* with very large result objects
   - *Use case*: Evaluating ML algorithms that produce large tensors or arrays
 
-- **[PyEvaluatorRay](./adtools/evaluator/py_evaluator_ray.py#L15-L136)**
+- **[PyEvaluatorRay](./adtools/evaluator/py_evaluator_ray.py#L15-L136) (Recommend)**
   - *Leverages Ray* for distributed, secure evaluation
   - *Supports zero-copy return* of large objects
   - *Ideal for cluster environments* and when maximum isolation is required
