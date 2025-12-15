@@ -1,7 +1,5 @@
 # Useful tools for parsing and evaluating Python programs for algorithm design/code optimization
 
-------
-
 > This repo aims to help develop more powerful [Large Language Models for Algorithm Design (LLM4AD)](https://github.com/Optima-CityU/llm4ad) applications. 
 >
 > More tools will be provided soon.
