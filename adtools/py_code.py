@@ -265,29 +265,26 @@ class _ProgramVisitor(ast.NodeVisitor):
         that belong to the body of multiline strings.
         """
         string_lines = set()
-        try:
-            # Tokenize the source code
-            tokens = tokenize.tokenize(BytesIO(sourcecode.encode("utf-8")).readline)
-            for token in tokens:
-                if token.type == tokenize.STRING:
-                    start_line, _ = token.start
-                    end_line, _ = token.end
+        # Tokenize the source code
+        tokens = tokenize.tokenize(BytesIO(sourcecode.encode("utf-8")).readline)
+        for token in tokens:
+            if token.type == tokenize.STRING:
+                start_line, _ = token.start
+                end_line, _ = token.end
 
-                    # If start_line != end_line, it is a multiline string.
-                    if end_line > start_line:
-                        # Mark the lines strictly between start and end as string body.
-                        # (The start line usually contains the assignment variable or key,
-                        # so standard indentation logic applies there).
-                        for i in range(start_line + 1, end_line):
-                            string_lines.add(i)
+                # If start_line != end_line, it is a multiline string.
+                if end_line > start_line:
+                    # Mark the lines strictly between start and end as string body.
+                    # (The start line usually contains the assignment variable or key,
+                    # so standard indentation logic applies there).
+                    for i in range(start_line + 1, end_line):
+                        string_lines.add(i)
 
-                        # Add the end line as well. Even if it only contains the closing quotes,
-                        # treating it as part of the string body prevents incorrect stripping
-                        # if the closing quotes are oddly indented.
-                        string_lines.add(end_line)
-        except Exception:
-            # If tokenization fails (e.g., due to syntax errors)
-            traceback.print_exc()
+                    # Add the end line as well. Even if it only contains the closing quotes,
+                    # treating it as part of the string body prevents incorrect stripping
+                    # if the closing quotes are oddly indented.
+                    string_lines.add(end_line)
+
         return string_lines
 
     def _get_code(self, start_line: int, end_line: int, remove_indent: int = 0) -> str:
