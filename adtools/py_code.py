@@ -9,7 +9,9 @@ import ast
 import dataclasses
 import textwrap
 import traceback
-from typing import List, Optional, Union
+import tokenize
+from typing import List, Optional, Union, Set
+from io import BytesIO
 
 __all__ = ["PyCodeBlock", "PyFunction", "PyClass", "PyProgram"]
 
@@ -130,8 +132,9 @@ class PyClass:
                         and isinstance(item, PyCodeBlock)
                     ):
                         class_def += "\n"
-                # Indent everything inside the class by 4 spaces
-                class_def += textwrap.indent(str(item), "    ")
+
+                # Use _smart_indent to indent code
+                class_def += _smart_indent(str(item), "    ")
                 class_def += "\n" if i != len(self.body) - 1 else ""
                 last_item = item
         else:
@@ -201,6 +204,49 @@ class PyProgram:
             return None
 
 
+def _smart_indent(code: str, indent_str: str) -> str:
+    """Indents code by `indent_str`, but skips lines that are inside
+    multiline strings to preserve their internal formatting.
+    """
+    lines = code.splitlines()
+    string_lines = set()
+
+    try:
+        # Identify lines belonging to multiline strings
+        tokens = tokenize.tokenize(BytesIO(code.encode("utf-8")).readline)
+        for token in tokens:
+            if token.type == tokenize.STRING:
+                start_line, _ = token.start
+                end_line, _ = token.end
+
+                # If it is a multiline string
+                if end_line > start_line:
+                    # We protect the content (start+1 to end).
+                    # We also protect the end_line because usually the closing quotes
+                    # are already positioned correctly in the source string.
+                    for i in range(start_line + 1, end_line + 1):
+                        string_lines.add(i)
+    except Exception:
+        # Fallback: if tokenization fails, we can't safely detect strings
+        traceback.print_exc()
+
+    result = []
+    for i, line in enumerate(lines):
+        lineno = i + 1
+        # If the line is inside a multiline string, append it as-is (no indent).
+        if lineno in string_lines:
+            result.append(line)
+        else:
+            # Otherwise, apply indentation.
+            # We strip whitespace to avoid indenting empty lines (mimicking textwrap behavior).
+            if line.strip():
+                result.append(indent_str + line)
+            else:
+                result.append("")
+
+    return "\n".join(result)
+
+
 class _ProgramVisitor(ast.NodeVisitor):
     """Parses code to collect all required information to produce a `PyProgram`.
     Handles scripts, functions, and classes with robust indentation handling.
@@ -213,13 +259,47 @@ class _ProgramVisitor(ast.NodeVisitor):
         self._classes: List[PyClass] = []
         self._elements: List[Union[PyFunction, PyClass, PyCodeBlock]] = []
         self._last_script_end = 0
+        # Pre-process to identify all lines that are part of a multiline string.
+        self._multiline_string_lines: Set[int] = self._detect_multiline_strings(
+            sourcecode
+        )
+
+    def _detect_multiline_strings(self, sourcecode: str) -> Set[int]:
+        """Scans the source code using tokenize to identify line numbers
+        that belong to the body of multiline strings.
+        """
+        string_lines = set()
+        try:
+            # Tokenize the source code
+            tokens = tokenize.tokenize(BytesIO(sourcecode.encode("utf-8")).readline)
+            for token in tokens:
+                if token.type == tokenize.STRING:
+                    start_line, _ = token.start
+                    end_line, _ = token.end
+
+                    # If start_line != end_line, it is a multiline string.
+                    if end_line > start_line:
+                        # Mark the lines strictly between start and end as string body.
+                        # (The start line usually contains the assignment variable or key,
+                        # so standard indentation logic applies there).
+                        for i in range(start_line + 1, end_line):
+                            string_lines.add(i)
+
+                        # Add the end line as well. Even if it only contains the closing quotes,
+                        # treating it as part of the string body prevents incorrect stripping
+                        # if the closing quotes are oddly indented.
+                        string_lines.add(end_line)
+        except Exception:
+            # If tokenization fails (e.g., due to syntax errors)
+            traceback.print_exc()
+        return string_lines
 
     def _get_code(self, start_line: int, end_line: int, remove_indent: int = 0) -> str:
         """Get code between start_line and end_line.
 
         Args:
             remove_indent: The number of spaces to strip from the beginning of each line.
-                his corresponds to the column offset of the function definition.
+                This corresponds to the column offset of the function/class definition.
         """
         if start_line >= end_line:
             return ""
@@ -228,18 +308,39 @@ class _ProgramVisitor(ast.NodeVisitor):
 
         if remove_indent > 0:
             dedented_lines = []
-            for line in lines:
-                # We only strip indentation if the line is long enough.
-                # If a line inside a multiline string is shorter/unindented (e.g., column 0),
-                # we keep it as is.
-                if len(line) >= remove_indent and line[:remove_indent].isspace():
-                    dedented_lines.append(line[remove_indent:])
+            indent_str = " " * remove_indent
+
+            for idx, line in enumerate(lines):
+                # Calculate the 1-based line number in the original source file
+                current_lineno = start_line + idx + 1
+
+                # Check if the current line is inside a multiline string
+                is_in_string = current_lineno in self._multiline_string_lines
+
+                if is_in_string:
+                    # STRICT DEDENT LOGIC for strings:
+                    # If we are inside a multiline string, we only strip indentation
+                    # if the line strictly starts with the expected block indentation.
+                    # This prevents stripping spaces from lines that have fewer spaces
+                    # than the block indentation (e.g., lines starting at col 0).
+                    if line.startswith(indent_str):
+                        dedented_lines.append(line[remove_indent:])
+                    else:
+                        # If the line does not start with the block indent (e.g., it is
+                        # to the left of the code block), we preserve it exactly as is.
+                        dedented_lines.append(line)
                 else:
-                    dedented_lines.append(line)
+                    # STANDARD LOGIC for code:
+                    # For normal code, we allow stripping if the line is empty (isspace),
+                    # even if it doesn't have the full indentation length.
+                    if len(line) >= remove_indent and line[:remove_indent].isspace():
+                        dedented_lines.append(line[remove_indent:])
+                    else:
+                        dedented_lines.append(line)
+
             return "\n".join(dedented_lines).rstrip()
         else:
-            # For top-level functions (remove_indent=0), we return the raw code.
-            # This perfectly preserves the structure of multiline strings with 0 indentation.
+            # For top-level functions (remove_indent=0), return raw code.
             return "\n".join(lines).rstrip()
 
     def _add_script_segment(self, start_line: int, end_line: int):
@@ -381,7 +482,9 @@ class _ProgramVisitor(ast.NodeVisitor):
                     class_body.append(method_func)
                 else:
                     code_text = self._get_code(
-                        item.lineno - 1, item.end_lineno, remove_indent=item.col_offset
+                        item_start_line - 1,
+                        item.end_lineno,
+                        remove_indent=item.col_offset,
                     )
                     block = PyCodeBlock(code=code_text)
                     statements.append(block)
