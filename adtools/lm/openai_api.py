@@ -72,3 +72,44 @@ class OpenAIAPI(LanguageModel):
             **kwargs,
         )
         return response.choices[0].message.content
+
+    def embedding(
+        self,
+        text: str | List[str],
+        dimensions: Optional[int] = None,
+        timeout_seconds: Optional[float] = None,
+        **kwargs,
+    ) -> List[float] | List[List[float]]:
+        """Generate embeddings for the given text(s) using the model specified during initialization.
+
+        Args:
+            text: The text or a list of texts to embed.
+            dimensions: The number of dimensions for the output embeddings.
+            timeout_seconds: The timeout seconds.
+
+        Returns:
+            The embedding for the text, or a list of embeddings for the list of texts.
+        """
+        is_str_input = isinstance(text, str)
+        if is_str_input:
+            text = [text]
+
+        # Prepare arguments for the OpenAI API call
+        api_kwargs = {
+            "input": text,
+            "model": self._model,
+        }
+        if dimensions is not None:
+            api_kwargs["dimensions"] = dimensions
+        if timeout_seconds is not None:
+            api_kwargs["timeout"] = timeout_seconds
+
+        api_kwargs.update(kwargs)
+
+        response = self._client.embeddings.create(**api_kwargs)
+
+        embeddings = [item.embedding for item in response.data]
+
+        if is_str_input:
+            return embeddings[0]
+        return embeddings
