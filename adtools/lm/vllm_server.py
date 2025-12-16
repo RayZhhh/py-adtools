@@ -349,6 +349,10 @@ class VLLMServer(LanguageModel):
         if self._vllm_server_process is not None:
             self._kill_vllm_process()
 
+    def reload(self):
+        """Reload the vllm server."""
+        self.launch_vllm_server()
+
     def chat_completion(
         self,
         message: str | List[openai.types.chat.ChatCompletionMessageParam],
