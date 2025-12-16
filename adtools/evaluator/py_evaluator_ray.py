@@ -51,7 +51,7 @@ class PyEvaluatorRay(PyEvaluator):
         program: str | PyProgram,
         timeout_seconds: int | float = None,
         redirect_to_devnull: bool = False,
-        get_evaluate_time: bool = False,
+        *,
         ray_worker_options: dict[str, Any] = None,
         **kwargs,
     ) -> EvaluationResults:

@@ -29,7 +29,7 @@ import psutil
 import traceback
 
 from adtools.py_code import PyProgram
-from adtools.evaluator.utils import _redirect_to_devnull, _set_mp_start_method
+from adtools.evaluator.utils import _redirect_to_devnull
 
 __all__ = [
     "EvaluationResults",
@@ -209,9 +209,6 @@ class PyEvaluator(ABC):
         program: str | PyProgram,
         timeout_seconds: int | float = None,
         redirect_to_devnull: bool = False,
-        multiprocessing_start_method: Literal[
-            "default", "auto", "fork", "spawn"
-        ] = "default",
         **kwargs,
     ) -> EvaluationResults:
         """Evaluate program in a new process. This enables timeout restriction and output redirection.
@@ -220,17 +217,12 @@ class PyEvaluator(ABC):
             program: the program to be evaluated.
             timeout_seconds: return 'None' if the execution time exceeds 'timeout_seconds'.
             redirect_to_devnull: redirect any output to '/dev/null'.
-            multiprocessing_start_method: start a process using 'fork' or 'spawn'. If set to 'auto',
-                the process will be started using 'fork' with Linux/macOS and 'spawn' with Windows.
-                If set to 'default', there will be no changes to system default.
             **kwargs: additional keyword arguments to pass to 'evaluate_program'.
 
         Returns:
             Returns the evaluation results. If the 'get_evaluate_time' is True,
             the return value will be (Results, Time).
         """
-        _set_mp_start_method(multiprocessing_start_method)
-
         try:
             # Start evaluation process
             result_queue = multiprocessing.Queue()
@@ -350,9 +342,6 @@ class PyEvaluatorReturnInManagerDict(PyEvaluator):
         program: str | PyProgram,
         timeout_seconds: int | float = None,
         redirect_to_devnull: bool = False,
-        multiprocessing_start_method: Literal[
-            "default", "auto", "fork", "spawn"
-        ] = "default",
         **kwargs,
     ):
         """Evaluate program in a new process. This enables timeout restriction and output redirection.
@@ -361,17 +350,12 @@ class PyEvaluatorReturnInManagerDict(PyEvaluator):
             program: the program to be evaluated.
             timeout_seconds: return 'None' if the execution time exceeds 'timeout_seconds'.
             redirect_to_devnull: redirect any output to '/dev/null'.
-            multiprocessing_start_method: start a process using 'fork' or 'spawn'. If set to 'auto',
-                the process will be started using 'fork' with Linux/macOS and 'spawn' with Windows.
-                If set to 'default', there will be no changes to system default.
             **kwargs: additional keyword arguments to pass to 'evaluate_program'.
 
         Returns:
             Returns the evaluation results. If the 'get_evaluate_time' is True,
             the return value will be (Results, Time).
         """
-        _set_mp_start_method(multiprocessing_start_method)
-
         with multiprocessing.Manager() as manager:
             try:
                 # Path a dictionary to the evaluation process to get maybe very big return objects
@@ -533,9 +517,6 @@ class PyEvaluatorReturnInSharedMemory(PyEvaluator):
         program: str | PyProgram,  # Assuming PyProgram is defined
         timeout_seconds: int | float = None,
         redirect_to_devnull: bool = False,
-        multiprocessing_start_method: Literal[
-            "default", "auto", "fork", "spawn"
-        ] = "default",
         **kwargs,
     ) -> EvaluationResults:
         """Evaluate program in a new process. This enables timeout restriction and output redirection.
@@ -544,9 +525,6 @@ class PyEvaluatorReturnInSharedMemory(PyEvaluator):
             program: the program to be evaluated.
             timeout_seconds: return 'None' if the execution time exceeds 'timeout_seconds'.
             redirect_to_devnull: redirect any output to '/dev/null'.
-            multiprocessing_start_method: start a process using 'fork' or 'spawn'. If set to 'auto',
-                the process will be started using 'fork' with Linux/macOS and 'spawn' with Windows.
-                If set to 'default', there will be no changes to system default.
             **kwargs: additional keyword arguments to pass to 'evaluate_program'.
 
         Returns:
