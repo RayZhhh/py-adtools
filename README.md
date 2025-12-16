@@ -33,7 +33,7 @@ Or install via pip:
 pip install py-adtools
 ```
 
-## 1. Code Parsing with [py_code](./algolm/py-adtools/adtools/py_code.py#L0-L518)
+## 1 Code Parsing with [py_code](./algolm/py-adtools/adtools/py_code.py#L0-L518)
 
 [adtools.py_code](./adtools/py_code.py#L0-L518) provides robust parsing of Python programs into structured components
 that can be easily manipulated, modified, and analyzed.
@@ -109,7 +109,7 @@ print(p.functions[0].name)
 - **Complete Program Representation**: [PyProgram](./adtools/py_code.py#L176-L203) maintains the exact sequence of
   elements as they appear in the source code
 
-## 2. Code Evaluation with `evaluator`
+## 2 Code Evaluation with `evaluator`
 
 `adtools.evaluator` provides multiple secure evaluation options for running and testing Python code.
 
@@ -241,7 +241,7 @@ if __name__ == "__main__":
 All evaluators share the same interface through the abstract [PyEvaluator](./adtools/evaluator/py_evaluator.py#L47-L270)
 class, making it easy to switch between implementations based on your specific needs.
 
-## 3. Practical Applications
+## 3 Practical Applications
 
 ### 3.1 Parser for Code Manipulation
 
@@ -468,3 +468,11 @@ This demonstrates how `adtools` handles:
 
 The evaluation framework ensures that even if the code contains errors, infinite loops, or attempts to access system
 resources, your main application remains safe and responsive.
+
+## 4 License
+
+This project is licensed under the **MIT License**. See the [LICENSE](./LICENSE) file for details.
+
+## 5 Contact & Feedback
+
+If you have any questions, encounter bugs, or have suggestions for improvement, please feel free to [open an issue](https://github.com/RayZhhh/py-adtools/issues) or contact us. Your contributions and feedback are highly appreciated!
