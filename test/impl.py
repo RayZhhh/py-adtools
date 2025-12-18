@@ -1,6 +1,6 @@
 import time
 from typing import Dict, List, Callable, Any
-from adtools.evaluator import PyEvaluator, PyEvaluatorReturnInManagerDict, PyEvaluatorReturnInSharedMemory
+from adtools.evaluator import PyEvaluator, PyEvaluatorManagerDict, PyEvaluatorSharedMemory
 
 # Try importing Ray Evaluator Base
 from adtools.evaluator import PyEvaluatorRay
@@ -27,7 +27,7 @@ class ConcreteEvaluatorBase(PyEvaluator):
 # =============================================================================
 # 2. Manager Dict Evaluator
 # =============================================================================
-class ConcreteEvaluatorDict(PyEvaluatorReturnInManagerDict):
+class ConcreteEvaluatorDict(PyEvaluatorManagerDict):
     """
     Uses multiprocessing.Manager().dict().
     """
@@ -40,7 +40,7 @@ class ConcreteEvaluatorDict(PyEvaluatorReturnInManagerDict):
 # =============================================================================
 # 3. Shared Memory Evaluator
 # =============================================================================
-class ConcreteEvaluatorShm(PyEvaluatorReturnInSharedMemory):
+class ConcreteEvaluatorShm(PyEvaluatorSharedMemory):
     """
     Uses SharedMemory for zero-copy (simulated) data transfer.
     """

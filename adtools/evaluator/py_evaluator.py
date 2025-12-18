@@ -20,13 +20,15 @@ import multiprocessing
 import pickle
 import time
 import uuid
+import warnings
 from abc import ABC, abstractmethod
 from multiprocessing import shared_memory
 from queue import Empty
 from typing import Any, Literal, Dict, Callable, List, Tuple, TypedDict
 import multiprocessing.managers
-import psutil
 import traceback
+
+import psutil
 
 from adtools.py_code import PyProgram
 from adtools.evaluator.utils import _redirect_to_devnull
@@ -34,8 +36,8 @@ from adtools.evaluator.utils import _redirect_to_devnull
 __all__ = [
     "EvaluationResults",
     "PyEvaluator",
-    "PyEvaluatorReturnInManagerDict",
-    "PyEvaluatorReturnInSharedMemory",
+    # "PyEvaluatorManagerDict",
+    "PyEvaluatorSharedMemory",
 ]
 
 
@@ -263,7 +265,7 @@ class PyEvaluator(ABC):
             self._kill_process_and_its_children(process)
 
 
-class PyEvaluatorReturnInManagerDict(PyEvaluator):
+class PyEvaluatorManagerDict(PyEvaluator):
     def __init__(
         self,
         exec_code: bool = True,
@@ -287,6 +289,11 @@ class PyEvaluatorReturnInManagerDict(PyEvaluator):
             debug_mode: Debug mode.
             join_timeout_seconds: Timeout in seconds to wait for the process to finish. Kill the process if timeout.
         """
+        warnings.warn(
+            "Use 'PyEvaluatorSharedMemory' or 'PyEvaluatorRay' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(
             exec_code,
             find_and_kill_children_evaluation_process,
@@ -416,7 +423,7 @@ class PyEvaluatorReturnInManagerDict(PyEvaluator):
                 self._kill_process_and_its_children(process)
 
 
-class PyEvaluatorReturnInSharedMemory(PyEvaluator):
+class PyEvaluatorSharedMemory(PyEvaluator):
 
     def __init__(
         self,

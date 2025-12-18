@@ -1,7 +1,7 @@
 from adtools.evaluator.py_evaluator import (
     EvaluationResults,
     PyEvaluator,
-    PyEvaluatorReturnInManagerDict,
-    PyEvaluatorReturnInSharedMemory,
+    PyEvaluatorManagerDict,
+    PyEvaluatorSharedMemory,
 )
 from adtools.evaluator.py_evaluator_ray import PyEvaluatorRay

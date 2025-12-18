@@ -9,3 +9,5 @@ remove_files.sh
 _ignore_files
 .gitignore
 debug
+.venv
+**/*.egg-info

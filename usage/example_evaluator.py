@@ -2,10 +2,10 @@ import time
 from typing import Dict, Callable, List, Any
 
 from adtools import PyEvaluator
-from adtools.evaluator import PyEvaluatorReturnInSharedMemory
+from adtools.evaluator import PyEvaluatorSharedMemory
 
 
-class SortAlgorithmEvaluator(PyEvaluatorReturnInSharedMemory):
+class SortAlgorithmEvaluator(PyEvaluatorSharedMemory):
     def evaluate_program(
         self,
         program_str: str,
