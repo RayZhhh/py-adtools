@@ -531,8 +531,6 @@ class PyEvaluatorReturnInSharedMemory(PyEvaluator):
             Returns the evaluation results. If the 'get_evaluate_time' is True,
             the return value will be (Results, Time).
         """
-        _set_mp_start_method(multiprocessing_start_method)  # noqa
-
         # Evaluate and get results
         try:
             # Create a meta queue to get meta information from the evaluation process
