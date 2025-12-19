@@ -202,7 +202,7 @@ class PyEvaluator(ABC):
             res = self._exec_and_get_res(program_str, **kwargs)
             result_queue.put((res, ""))
         except:
-            if not self.debug_mode:
+            if self.debug_mode:
                 traceback.print_exc()
             result_queue.put((None, str(traceback.format_exc())))
 
