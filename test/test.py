@@ -1,6 +1,7 @@
 import time
 import multiprocessing
 import sys
+sys.path.append("../")
 import os
 import traceback
 
@@ -25,7 +26,7 @@ except ImportError:
 from adtools.evaluator import EvaluationResults
 from impl import (
     ConcreteEvaluatorBase,
-    ConcreteEvaluatorDict,
+    # ConcreteEvaluatorDict,
     ConcreteEvaluatorShm,
     ConcreteEvaluatorRay,
 )
@@ -111,14 +112,14 @@ def run_test_matrix():
         )
     )
     # 2. Manager Dict
-    evaluators.append(
-        (
-            "ManagerDict",
-            ConcreteEvaluatorDict(
-                exec_code=True, find_and_kill_children_evaluation_process=True
-            ),
-        )
-    )
+    # evaluators.append(
+    #     (
+    #         "ManagerDict",
+    #         ConcreteEvaluatorDict(
+    #             exec_code=True, find_and_kill_children_evaluation_process=True
+    #         ),
+    #     )
+    # )
     # 3. Shared Memory
     evaluators.append(
         (

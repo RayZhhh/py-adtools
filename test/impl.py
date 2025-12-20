@@ -1,6 +1,6 @@
 import time
 from typing import Dict, List, Callable, Any
-from adtools.evaluator import PyEvaluator, PyEvaluatorManagerDict, PyEvaluatorSharedMemory
+from adtools.evaluator import PyEvaluator, PyEvaluatorSharedMemory
 
 # Try importing Ray Evaluator Base
 from adtools.evaluator import PyEvaluatorRay
@@ -27,15 +27,15 @@ class ConcreteEvaluatorBase(PyEvaluator):
 # =============================================================================
 # 2. Manager Dict Evaluator
 # =============================================================================
-class ConcreteEvaluatorDict(PyEvaluatorManagerDict):
-    """
-    Uses multiprocessing.Manager().dict().
-    """
-    def evaluate_program(self, program_str, callable_functions_dict, *args, **kwargs):
-        target_func_name = "solver"
-        if callable_functions_dict and target_func_name in callable_functions_dict:
-            return callable_functions_dict[target_func_name]()
-        raise RuntimeError(f"Entry point '{target_func_name}' not found.")
+# class ConcreteEvaluatorDict(PyEvaluatorManagerDict):
+#     """
+#     Uses multiprocessing.Manager().dict().
+#     """
+#     def evaluate_program(self, program_str, callable_functions_dict, *args, **kwargs):
+#         target_func_name = "solver"
+#         if callable_functions_dict and target_func_name in callable_functions_dict:
+#             return callable_functions_dict[target_func_name]()
+#         raise RuntimeError(f"Entry point '{target_func_name}' not found.")
 
 # =============================================================================
 # 3. Shared Memory Evaluator
