@@ -5,17 +5,6 @@ NOTICE: This code is under MIT license. This code is intended for academic/resea
 Commercial use of this software or its derivatives requires prior written permission.
 """
 
-# -------------------------------------------------------------------------------------------------
-# - This file provides three different kinds of evaluators:
-#     (1) PyEvaluator
-#     (2) PyEvaluatorReturnInManagerDict
-#     (3) PyEvaluatorReturnInSharedMemory
-# - All evaluators must implement the 'evaluate_program' method.
-# - If the implementation of 'evaluate_program' returns a large object, e.g., a big tensor,
-#   the 'PyEvaluatorReturnInSharedMemory' should be a better choice.
-# -------------------------------------------------------------------------------------------------
-
-
 import multiprocessing
 import pickle
 import time
@@ -24,7 +13,7 @@ import warnings
 from abc import ABC, abstractmethod
 from multiprocessing import shared_memory
 from queue import Empty
-from typing import Any, Literal, Dict, Callable, List, Tuple, TypedDict
+from typing import Any, Dict, Callable, List, TypedDict
 import multiprocessing.managers
 import traceback
 
@@ -608,7 +597,7 @@ class PyEvaluatorSharedMemory(PyEvaluator):
                 # Attempt to attach to the shared memory block
                 shm_cleanup = shared_memory.SharedMemory(name=unique_shm_name)
                 # Unlink (delete) it from the system, and close the shared memory
-                # shm_cleanup.unlink()  # Todo: enable unlink for individual OS
+                shm_cleanup.unlink()
                 shm_cleanup.close()
             except FileNotFoundError:
                 # This is normal if the child process never reached the creation step

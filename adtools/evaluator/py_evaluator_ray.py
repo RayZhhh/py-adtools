@@ -56,11 +56,17 @@ class PyEvaluatorRay(PyEvaluator):
         **kwargs,
     ) -> EvaluationResults:
         """Evaluates the program in a separate Ray Actor (process)."""
-        # Lazy Import for Execution
         import ray
+        import sys
         from ray.exceptions import GetTimeoutError  # fmt:skip
 
-        # Ensure the worker can import 'adtools' by adding the project root to PYTHONPATH
+        # Convert PyProgram to string if necessary
+        program_str = str(program)
+
+        # We synchronize the current 'sys.path' to the Ray Worker's PYTHONPATH.
+        # This ensures that any package importable in the driver (this process)
+        # is also importable in the worker, including 'adtools' itself and
+        # any other local or custom-installed packages.
         if ray_worker_options is None:
             ray_worker_options = {}
         else:
@@ -69,22 +75,26 @@ class PyEvaluatorRay(PyEvaluator):
         runtime_env = ray_worker_options.get("runtime_env", {})
         env_vars = runtime_env.get("env_vars", {})
 
-        # Point to the package root:
-        # .../adtools/evaluator/py_evaluator_ray.py -> .../adtools/evaluator -> .../adtools -> .../
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        # Collect current sys.path, filtering out empty or invalid paths
+        current_paths = [p for p in sys.path if p and os.path.exists(p)]
 
-        current_pythonpath = env_vars.get("PYTHONPATH", "")
-        if project_root not in current_pythonpath:
-            if current_pythonpath:
-                env_vars["PYTHONPATH"] = f"{current_pythonpath}{os.pathsep}{project_root}"
-            else:
-                env_vars["PYTHONPATH"] = project_root
+        # Merge with existing PYTHONPATH if provided by user
+        existing_pythonpath = env_vars.get("PYTHONPATH", "")
+        if existing_pythonpath:
+            current_paths.insert(0, existing_pythonpath)
 
+        # Deduplicate while preserving order
+        unique_paths = []
+        seen = set()
+        for p in current_paths:
+            if p not in seen:
+                unique_paths.append(p)
+                seen.add(p)
+
+        # Update environment variables for the worker
+        env_vars["PYTHONPATH"] = os.pathsep.join(unique_paths)
         runtime_env["env_vars"] = env_vars
         ray_worker_options["runtime_env"] = runtime_env
-
-        # Convert PyProgram to string if necessary
-        program_str = str(program)
 
         # Create a new Ray Actor (Sandbox)
         # Since we cannot use @ray.remote at the top level (ray is not imported yet),

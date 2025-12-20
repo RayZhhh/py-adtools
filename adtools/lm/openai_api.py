@@ -105,9 +105,7 @@ class OpenAIAPI(LanguageModel):
             api_kwargs["timeout"] = timeout_seconds
 
         api_kwargs.update(kwargs)
-
         response = self._client.embeddings.create(**api_kwargs)
-
         embeddings = [item.embedding for item in response.data]
 
         if is_str_input:
