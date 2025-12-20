@@ -43,7 +43,7 @@ class PyEvaluatorRay(PyEvaluator):
                 ignore_reinit_error=True,
                 include_dashboard=False,
                 logging_level=logging.ERROR,
-                log_to_driver=False,
+                # log_to_driver=False,
             )
 
     def secure_evaluate(
@@ -59,6 +59,29 @@ class PyEvaluatorRay(PyEvaluator):
         # Lazy Import for Execution
         import ray
         from ray.exceptions import GetTimeoutError  # fmt:skip
+
+        # Ensure the worker can import 'adtools' by adding the project root to PYTHONPATH
+        if ray_worker_options is None:
+            ray_worker_options = {}
+        else:
+            ray_worker_options = ray_worker_options.copy()
+
+        runtime_env = ray_worker_options.get("runtime_env", {})
+        env_vars = runtime_env.get("env_vars", {})
+
+        # Point to the package root:
+        # .../adtools/evaluator/py_evaluator_ray.py -> .../adtools/evaluator -> .../adtools -> .../
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+        current_pythonpath = env_vars.get("PYTHONPATH", "")
+        if project_root not in current_pythonpath:
+            if current_pythonpath:
+                env_vars["PYTHONPATH"] = f"{current_pythonpath}{os.pathsep}{project_root}"
+            else:
+                env_vars["PYTHONPATH"] = project_root
+
+        runtime_env["env_vars"] = env_vars
+        ray_worker_options["runtime_env"] = runtime_env
 
         # Convert PyProgram to string if necessary
         program_str = str(program)
