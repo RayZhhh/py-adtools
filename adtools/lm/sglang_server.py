@@ -5,16 +5,6 @@ NOTICE: This code is under MIT license. This code is intended for academic/resea
 Commercial use of this software or its derivatives requires prior written permission.
 """
 
-try:
-    import sglang
-except ImportError:
-    raise ImportError('Python package "sglang" is not installed.')
-
-try:
-    import requests
-except ImportError:
-    raise ImportError('Python package "requests" is not installed.')
-
 from typing import Optional, List, Literal, Dict, Any
 import os
 import subprocess
@@ -96,6 +86,11 @@ class SGLangServer(LanguageModel):
             # Use the adapter
             llm.chat_completion("Hello", lora_name="my_adapter")
         """
+        try:
+            import requests
+        except ImportError:
+            raise
+
         self._model_path = model_path
         self._port = port
         self._gpus = gpus
@@ -120,6 +115,11 @@ class SGLangServer(LanguageModel):
             self.launch_sglang_server()
 
     def launch_sglang_server(self, detach: bool = False, skip_if_running: bool = False):
+        try:
+            import sglang
+        except ImportError:
+            raise
+
         if skip_if_running and self._is_server_running():
             print(
                 f"[SGLang] Server already running on http://{self._host}:{self._port}. "

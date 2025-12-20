@@ -5,16 +5,6 @@ NOTICE: This code is under MIT license. This code is intended for academic/resea
 Commercial use of this software or its derivatives requires prior written permission.
 """
 
-try:
-    import vllm
-except ImportError:
-    raise ImportError('Python package "vllm" is not installed.')
-
-try:
-    import requests
-except ImportError:
-    raise ImportError('Python package "requests" is not installed.')
-
 from typing import Optional, List, Literal, Dict, Any
 import os
 import subprocess
@@ -105,6 +95,11 @@ class VLLMServer(LanguageModel):
             # release resources
             llm.close()
         """
+        try:
+            import requests
+        except ImportError:
+            raise
+
         self._model_path = model_path
         self._port = port
         self._gpus = gpus
@@ -130,6 +125,11 @@ class VLLMServer(LanguageModel):
             self.launch_vllm_server()
 
     def launch_vllm_server(self, detach: bool = False, skip_if_running: bool = False):
+        try:
+            import vllm
+        except ImportError:
+            raise
+
         if skip_if_running and self._is_server_running():
             print(
                 f"[vLLM] Server already running on http://{self._host}:{self._port}. "
