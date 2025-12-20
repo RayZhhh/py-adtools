@@ -14,6 +14,7 @@ import psutil
 import time
 
 import openai.types.chat
+import requests
 
 from adtools.lm.lm_base import LanguageModel
 
@@ -86,11 +87,6 @@ class SGLangServer(LanguageModel):
             # Use the adapter
             llm.chat_completion("Hello", lora_name="my_adapter")
         """
-        try:
-            import requests
-        except ImportError:
-            raise
-
         self._model_path = model_path
         self._port = port
         self._gpus = gpus

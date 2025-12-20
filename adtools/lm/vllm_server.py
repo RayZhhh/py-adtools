@@ -14,6 +14,7 @@ import psutil
 import time
 
 import openai.types.chat
+import requests
 
 from adtools.lm.lm_base import LanguageModel
 
@@ -95,11 +96,6 @@ class VLLMServer(LanguageModel):
             # release resources
             llm.close()
         """
-        try:
-            import requests
-        except ImportError:
-            raise
-
         self._model_path = model_path
         self._port = port
         self._gpus = gpus
