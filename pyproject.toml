@@ -22,6 +22,7 @@ dependencies = [
     "psutil",
     "openai",
     "ray",
+    "requests"
 ]
 
 [project.urls]
