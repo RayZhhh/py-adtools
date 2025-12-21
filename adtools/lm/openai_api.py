@@ -5,12 +5,15 @@ NOTICE: This code is under MIT license. This code is intended for academic/resea
 Commercial use of this software or its derivatives requires prior written permission.
 """
 
+import logging
 import os
 from typing import List, Optional
 
 import openai.types.chat
 
 from adtools.lm.lm_base import LanguageModel
+
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 class OpenAIAPI(LanguageModel):
