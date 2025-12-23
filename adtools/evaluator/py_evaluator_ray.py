@@ -43,7 +43,7 @@ class PyEvaluatorRay(PyEvaluator):
                 ignore_reinit_error=True,
                 include_dashboard=False,
                 logging_level=logging.ERROR,
-                # log_to_driver=False,
+                log_to_driver=False,
             )
 
     def secure_evaluate(

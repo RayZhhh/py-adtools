@@ -60,7 +60,7 @@ class SGLangServer(LanguageModel):
             tokenizer_path: Path to the tokenizer. Defaults to model_path.
             context_length: The context length (mapped to --context-length).
             max_lora_rank: Max rank of LoRA adapter. Defaults to `None`.
-                           Set this to enable LoRA support (mapped to --max-lora-rank).
+                Set this to enable LoRA support (mapped to --max-lora-rank).
             host: Host address for SGLang server.
             mem_fraction_static: The memory fraction for static allocation (mapped to --mem-fraction-static).
             deploy_timeout_seconds: Timeout to deploy (in seconds).
@@ -68,7 +68,8 @@ class SGLangServer(LanguageModel):
             sglang_log_level: Log level.
             silent_mode: Silent mode.
             env_variable_dict: Environment variables to use.
-            sglang_serve_args: Additional arguments to pass to sglang server, e.g., ['--enable-flashinfer'].
+            sglang_serve_args: Additional arguments to pass to sglang server, e.g., ['--enable-flashinfer'],
+                or ['--attention-backend', 'triton']
             sglang_serve_kwargs: Keyword arguments to pass to sglang server.
             chat_template_kwargs: Keyword arguments for chat template (passed during request).
 
@@ -78,7 +79,8 @@ class SGLangServer(LanguageModel):
                 model_path='meta-llama/Meta-Llama-3-8B-Instruct',
                 port=30000,
                 gpus=[0, 1],
-                max_lora_rank=16  # Enable LoRA
+                max_lora_rank=16,  # Enable LoRA
+                sglang_serve_args=['--attention-backend', 'triton']
             )
 
             # Load an adapter

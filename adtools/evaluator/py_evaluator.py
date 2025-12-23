@@ -11,7 +11,7 @@ import time
 import uuid
 import warnings
 from abc import ABC, abstractmethod
-from multiprocessing import shared_memory
+from multiprocessing import shared_memory, resource_tracker
 from queue import Empty
 from typing import Any, Dict, Callable, List, TypedDict
 import multiprocessing.managers
@@ -494,6 +494,9 @@ class PyEvaluatorSharedMemory(PyEvaluator):
             shm = shared_memory.SharedMemory(
                 create=True, name=shm_name_id, size=len(data)
             )
+            # Unregister the shared memory block from the resource tracker in this child process
+            # The shared memory will be managed in the parent process
+            resource_tracker.unregister(shm._name, "shared_memory")
             # Write data
             shm.buf[: len(data)] = data
             # We only need to send back the size, as the parent already knows the name.
@@ -596,9 +599,10 @@ class PyEvaluatorSharedMemory(PyEvaluator):
             try:
                 # Attempt to attach to the shared memory block
                 shm_cleanup = shared_memory.SharedMemory(name=unique_shm_name)
+                shm_cleanup.close()
                 # Unlink (delete) it from the system, and close the shared memory
                 shm_cleanup.unlink()
-                shm_cleanup.close()
+
             except FileNotFoundError:
                 # This is normal if the child process never reached the creation step
                 # (e.g. crashed during calculation before creating SHM)

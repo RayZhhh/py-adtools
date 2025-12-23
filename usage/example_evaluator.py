@@ -1,7 +1,7 @@
 import time
 from typing import Dict, Callable, List, Any
 
-from adtools import PyEvaluator
+from adtools.evaluator import PyEvaluator
 from adtools.evaluator import PyEvaluatorSharedMemory
 
 
