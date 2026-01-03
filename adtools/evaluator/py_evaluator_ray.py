@@ -3,7 +3,7 @@ import os
 import time
 import traceback
 from abc import abstractmethod
-from typing import Any, Tuple, Dict, List, Callable
+from typing import Any, Dict, List, Callable
 
 from adtools.py_code import PyProgram
 from adtools.evaluator.py_evaluator import PyEvaluator, EvaluationResults
@@ -14,8 +14,10 @@ __all__ = ["PyEvaluatorRay"]
 
 
 class PyEvaluatorRay(PyEvaluator):
+
     def __init__(
         self,
+        init_ray: bool = True,
         exec_code: bool = True,
         debug_mode: bool = False,
     ):
@@ -23,6 +25,7 @@ class PyEvaluatorRay(PyEvaluator):
         It supports efficient zero-copy return of large objects (e.g., Tensors).
 
         Args:
+            init_ray: Whether to initialize the ray.
             exec_code: Whether to execute the code using 'exec()'.
             debug_mode: Enable debug print statements.
         """
@@ -31,19 +34,30 @@ class PyEvaluatorRay(PyEvaluator):
             debug_mode=debug_mode,
         )
 
-        # Lazy Import Start
         import ray
 
-        # Set environment variable before Ray initialization (moved from top-level)
-        os.environ["RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO"] = "0"
+        if init_ray:
+            if ray.is_initialized():
+                logging.warning(
+                    f"Ray is already initialized. "
+                    f"If you want to diable reinit, "
+                    f"please set '{self.__class__.__name__}(..., init_ray=False)'."
+                )
+            # Set environment variable before Ray initialization (moved from top-level)
+            os.environ["RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO"] = "0"
 
-        # Initialize Ray if not already running
-        if not ray.is_initialized():
+            # Initialize Ray
             ray.init(
                 ignore_reinit_error=True,
                 include_dashboard=False,
                 logging_level=logging.ERROR,
-                log_to_driver=False,
+                log_to_driver=True,
+            )
+        elif not ray.is_initialized():
+            # If ray is not initialized
+            raise RuntimeError(
+                f"Ray is not initialized. "
+                f"Please set '{self.__class__.__name__}(..., init_ray=True)'."
             )
 
     def secure_evaluate(
@@ -55,10 +69,22 @@ class PyEvaluatorRay(PyEvaluator):
         ray_worker_options: dict[str, Any] = None,
         **kwargs,
     ) -> EvaluationResults:
-        """Evaluates the program in a separate Ray Actor (process)."""
+        """Evaluates the program in a separate Ray Actor (process).
+
+        Args:
+            program: the program to be evaluated.
+            timeout_seconds: return 'None' if the execution time exceeds 'timeout_seconds'.
+            redirect_to_devnull: redirect any output to '/dev/null'.
+            ray_worker_options: kwargs pass to RayWorkerClass.options(...).
+            **kwargs: additional keyword arguments to pass to 'evaluate_program'.
+
+        Returns:
+            Returns the evaluation results. If the 'get_evaluate_time' is True,
+            the return value will be (Results, Time).
+        """
         import ray
         import sys
-        from ray.exceptions import GetTimeoutError  # fmt:skip
+        from ray.exceptions import GetTimeoutError
 
         # Convert PyProgram to string if necessary
         program_str = str(program)
@@ -98,8 +124,9 @@ class PyEvaluatorRay(PyEvaluator):
 
         # Create a new Ray Actor (Sandbox)
         # Since we cannot use @ray.remote at the top level (ray is not imported yet),
-        # we dynamically convert the class to a remote actor here.
+        # we dynamically convert the class to a remote actor here
         RemoteWorkerClass = ray.remote(max_concurrency=1)(_RayWorker)
+        RemoteWorkerClass: ray.actor.ActorClass
 
         # Create the worker instance
         worker = RemoteWorkerClass.options(**(ray_worker_options or {})).remote()

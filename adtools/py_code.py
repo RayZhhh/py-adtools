@@ -7,10 +7,8 @@ Commercial use of this software or its derivatives requires prior written permis
 
 import ast
 import dataclasses
-import textwrap
-import traceback
 import tokenize
-from typing import List, Optional, Union, Set
+from typing import List, Optional, Union, Set, Any
 from io import BytesIO
 
 __all__ = ["PyCodeBlock", "PyFunction", "PyClass", "PyProgram"]
@@ -202,6 +200,25 @@ class PyProgram:
             if debug:
                 raise
             return None
+
+    @classmethod
+    def remove_comments(cls, py_code: str | Any) -> str:
+        """Removes all comments from the given Python code string.
+
+        This function uses the `tokenize` module to identify and remove all
+        comment tokens (# ...) while attempting to preserve the original
+        code structure and formatting.
+        """
+        try:
+            py_code = str(py_code)
+            # Use tokenize to accurately identify and remove comments
+            io_obj = BytesIO(py_code.encode("utf-8"))
+            tokens = tokenize.tokenize(io_obj.readline)
+            filtered_tokens = [t for t in tokens if t.type != tokenize.COMMENT]
+            return tokenize.untokenize(filtered_tokens).decode("utf-8")
+        except (tokenize.TokenError, IndentationError):
+            # Return original code if tokenization fails
+            return py_code
 
 
 def _smart_indent(code: str, indent_str: str) -> str:

@@ -1,3 +1,6 @@
+import sys
+
+sys.path.append("../")
 from adtools import PyProgram
 
 code = r"""

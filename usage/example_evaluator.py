@@ -1,11 +1,13 @@
+import sys
+
+sys.path.append("../")
 import time
 from typing import Dict, Callable, List, Any
 
-from adtools.evaluator import PyEvaluator
-from adtools.evaluator import PyEvaluatorSharedMemory
+from adtools.evaluator import PyEvaluator, PyEvaluatorRay
 
 
-class SortAlgorithmEvaluator(PyEvaluatorSharedMemory):
+class SortAlgorithmEvaluator(PyEvaluatorRay):
     def evaluate_program(
         self,
         program_str: str,
@@ -88,5 +90,7 @@ if __name__ == "__main__":
 
     # Evaluate a harmful code, the evaluation will be terminated within 10 seconds
     # We will obtain a score of `None` due to the violation of time restriction
-    score = evaluator.secure_evaluate(harmful_code_generated_by_llm, timeout_seconds=10)
+    score = evaluator.secure_evaluate(
+        harmful_code_generated_by_llm, timeout_seconds=10, redirect_to_devnull=True
+    )
     print(f"Score: {score}")
