@@ -363,11 +363,15 @@ class _ProgramVisitor(ast.NodeVisitor):
         else:
             decorator = None
 
-        # Extract docstring safely
-        docstring = ast.get_docstring(node)
+        # Extract docstring
+        if isinstance(node.body[0], ast.Expr) and isinstance(
+            node.body[0].value, ast.Constant
+        ):
+            docstring = ast.literal_eval(ast.unparse(node.body[0])).strip()
+        else:
+            docstring = None
 
         # Determine where the actual code body starts
-        body_start_line_node = node.body[0]
         if docstring and len(node.body) > 1:
             body_start_line = node.body[1].lineno - 1
         elif docstring:
@@ -375,9 +379,9 @@ class _ProgramVisitor(ast.NodeVisitor):
         else:
             body_start_line = node.body[0].lineno - 1
 
-        # Extract body, and APPLY CRITICAL INDENTATION:
-        #   - Top-level functions (col_offset=0) -> Body is NOT modified
-        #   - Class methods (col_offset=4) -> Body loses exactly 4 spaces (the class indent)
+        # Extract body, and apply critical indentation:
+        # (1) For top-level functions (col_offset=0) -> Body is NOT modified
+        # (2) For class methods (col_offset=4) -> Body loses exactly 4 spaces (the class indent)
         body = self._get_code(
             body_start_line, node.end_lineno, remove_indent=node.col_offset
         )

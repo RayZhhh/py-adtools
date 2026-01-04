@@ -9,6 +9,9 @@ import numpy as np
 
 @numba.jit()                      # This part will be parsed into PyFunction
 def function(arg1, arg2=True):     
+    '''Docstring.
+    This is a function.
+    '''
     if arg2:
     	return arg1 * 2
     else:
@@ -25,6 +28,9 @@ class PythonClass(BaseClass):
         self.x = x                # and placed in PyClass.functions
 
     def method1(self):
+        '''Docstring.
+        This is a class method.
+        '''
         return self.x * 10
 
     @some.decorators()
