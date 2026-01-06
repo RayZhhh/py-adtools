@@ -7,7 +7,7 @@ from typing import Dict, Callable, List, Any
 from adtools.evaluator import PyEvaluator, PyEvaluatorRay
 
 
-class SortAlgorithmEvaluator(PyEvaluatorRay):
+class SortAlgorithmEvaluator(PyEvaluator):
     def evaluate_program(
         self,
         program_str: str,
@@ -91,6 +91,6 @@ if __name__ == "__main__":
     # Evaluate a harmful code, the evaluation will be terminated within 10 seconds
     # We will obtain a score of `None` due to the violation of time restriction
     score = evaluator.secure_evaluate(
-        harmful_code_generated_by_llm, timeout_seconds=10, redirect_to_devnull=True
+        harmful_code_generated_by_llm, timeout_seconds=10, redirect_to_devnull=False
     )
     print(f"Score: {score}")

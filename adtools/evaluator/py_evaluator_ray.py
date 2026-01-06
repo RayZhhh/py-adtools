@@ -1,3 +1,10 @@
+"""
+Copyright (c) 2025 Rui Zhang <rzhang.cs@gmail.com>
+
+NOTICE: This code is under MIT license. This code is intended for academic/research purposes only.
+Commercial use of this software or its derivatives requires prior written permission.
+"""
+
 import logging
 import os
 import time
@@ -20,6 +27,9 @@ class PyEvaluatorRay(PyEvaluator):
         init_ray: bool = True,
         exec_code: bool = True,
         debug_mode: bool = False,
+        *,
+        ray_rotation_max_bytes: int = 50 * 1024 * 1024,  # 50 MB
+        ray_rotation_backup_count: int = 1,
     ):
         """Evaluator using Ray for secure, isolated execution.
         It supports efficient zero-copy return of large objects (e.g., Tensors).
@@ -45,6 +55,8 @@ class PyEvaluatorRay(PyEvaluator):
                 )
             # Set environment variable before Ray initialization (moved from top-level)
             os.environ["RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO"] = "0"
+            os.environ["RAY_ROTATION_MAX_BYTES"] = str(ray_rotation_max_bytes)
+            os.environ["RAY_ROTATION_BACKUP_COUNT"] = str(ray_rotation_backup_count)
 
             # Initialize Ray
             ray.init(

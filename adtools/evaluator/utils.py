@@ -1,3 +1,10 @@
+"""
+Copyright (c) 2025 Rui Zhang <rzhang.cs@gmail.com>
+
+NOTICE: This code is under MIT license. This code is intended for academic/research purposes only.
+Commercial use of this software or its derivatives requires prior written permission.
+"""
+
 import multiprocessing
 import os
 import sys
