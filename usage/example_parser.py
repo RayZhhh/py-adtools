@@ -52,6 +52,8 @@ if __name__ == '__main__':        # This part will be parsed into PyCodeBlock
 p = PyProgram.from_text(code, debug=True)
 print(p)
 print(f"-------------------------------------")
+print(p.classes[0].functions[1])
+print(f"-------------------------------------")
 print(p.classes[0].functions[2].decorator)
 print(f"-------------------------------------")
 print(p.functions[0].name)
