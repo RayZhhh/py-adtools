@@ -196,7 +196,7 @@ class PyEvaluator(ABC):
             )
             # Unregister the shared memory block from the resource tracker in this child process
             # The shared memory will be managed in the parent process
-            resource_tracker.unregister(shm._name, "shared_memory")
+            resource_tracker.unregister(name=shm_name_id, rtype="shared_memory")
             # Write data
             shm.buf[: len(data)] = data
             # We only need to send back the size, as the parent already knows the name.

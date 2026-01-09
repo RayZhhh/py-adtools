@@ -7,6 +7,7 @@ Commercial use of this software or its derivatives requires prior written permis
 
 import ast
 import dataclasses
+import textwrap
 import tokenize
 from typing import List, Optional, Union, Set, Any
 from io import BytesIO
@@ -28,13 +29,15 @@ class PyCodeBlock:
     def __repr__(self) -> str:
         return self.__str__() + "\n"
 
+    def _to_str(self, indent_str=""):
+        return _indent_code_skip_multi_line_str(self.code, indent_str)
 
+
+# Part of PyFunction class is referenced from:
+# https://github.com/google-deepmind/funsearch/blob/main/implementation/code_manipulation.py
 @dataclasses.dataclass
 class PyFunction:
-    """A parsed Python function.
-    Part of this class is referenced from:
-    https://github.com/google-deepmind/funsearch/blob/main/implementation/code_manipulation.py
-    """
+    """A parsed Python function."""
 
     decorator: str
     name: str
@@ -43,6 +46,23 @@ class PyFunction:
     return_type: Optional[str] = None
     docstring: Optional[str] = None
     is_async: bool = False
+
+    def _to_str(self, indent_str=""):
+        return_type = f" -> {self.return_type}" if self.return_type else ""
+        function_def = f"{self.decorator}\n" if self.decorator else ""
+        prefix = "async def" if self.is_async else "def"
+        function_def += f"{prefix} {self.name}({self.args}){return_type}:\n"
+        function_def = _indent_code_skip_multi_line_str(function_def, indent_str) + "\n"
+
+        if self.docstring:
+            # We indent the docstring. Assumes 4-space standard indentation for generation.
+            new_line = "\n" if self.body else ""
+            function_def += (
+                textwrap.indent(f'    """{self.docstring}"""', indent_str) + new_line
+            )
+
+        function_def += _indent_code_skip_multi_line_str(self.body, indent_str)
+        return function_def
 
     def __str__(self) -> str:
         return_type = f" -> {self.return_type}" if self.return_type else ""
@@ -131,8 +151,9 @@ class PyClass:
                     ):
                         class_def += "\n"
 
-                # Use _smart_indent to indent code
-                class_def += _smart_indent(str(item), "    ")
+                # Use item._to_str() to indent each item in the class
+                assert isinstance(item, (PyCodeBlock, PyFunction))
+                class_def += str(item._to_str(indent_str="    "))
                 class_def += "\n" if i != len(self.body) - 1 else ""
                 last_item = item
         else:
@@ -221,7 +242,7 @@ class PyProgram:
             return py_code
 
 
-def _smart_indent(code: str, indent_str: str) -> str:
+def _indent_code_skip_multi_line_str(code: str, indent_str: str) -> str:
     """Indents code by `indent_str`, but skips lines that are inside
     multiline strings to preserve their internal formatting.
     """
@@ -289,17 +310,18 @@ class _ProgramVisitor(ast.NodeVisitor):
                 start_line, _ = token.start
                 end_line, _ = token.end
 
-                # If start_line != end_line, it is a multiline string.
+                # If start_line != end_line, it is a multiline string
                 if end_line > start_line:
-                    # Mark the lines strictly between start and end as string body.
-                    # (The start line usually contains the assignment variable or key,
-                    # so standard indentation logic applies there).
+                    # Mark the lines strictly between start and end as string body
+                    # The start line usually contains the assignment variable or key,
+                    # so standard indentation logic applies there
                     for i in range(start_line + 1, end_line):
                         string_lines.add(i)
 
-                    # Add the end line as well. Even if it only contains the closing quotes,
+                    # Add the end line as well
+                    # Even if it only contains the closing quotes,
                     # treating it as part of the string body prevents incorrect stripping
-                    # if the closing quotes are oddly indented.
+                    # if the closing quotes are oddly indented
                     string_lines.add(end_line)
 
         return string_lines
@@ -337,7 +359,7 @@ class _ProgramVisitor(ast.NodeVisitor):
 
             return "\n".join(dedented_lines).rstrip()
         else:
-            # For top-level functions (remove_indent=0), return raw code.
+            # For top-level functions (remove_indent=0), return raw code
             return "\n".join(lines).rstrip()
 
     def _add_script_segment(self, start_line: int, end_line: int):
@@ -368,6 +390,18 @@ class _ProgramVisitor(ast.NodeVisitor):
             node.body[0].value, ast.Constant
         ):
             docstring = ast.literal_eval(ast.unparse(node.body[0])).strip()
+            # Dedent docstring based on the node offset
+            dedented_docstring_lines = []
+            # For top-level functions, the node.col_offset is 0, docstring is not modified
+            # For class methods, the node.col_offset is 4, we dedent docstring for 4 spaces (the class indent)
+            remove_indent = node.col_offset
+
+            for idx, line in enumerate(docstring.splitlines()):
+                if len(line) >= remove_indent and line[:remove_indent].isspace():
+                    line = line[remove_indent:]
+                dedented_docstring_lines.append(line)
+
+            docstring = "\n".join(dedented_docstring_lines)
         else:
             docstring = None
 
@@ -380,8 +414,8 @@ class _ProgramVisitor(ast.NodeVisitor):
             body_start_line = node.body[0].lineno - 1
 
         # Extract body, and apply critical indentation:
-        # (1) For top-level functions (col_offset=0) -> Body is NOT modified
-        # (2) For class methods (col_offset=4) -> Body loses exactly 4 spaces (the class indent)
+        # For top-level functions, col_offset is 0, the body is not modified
+        # For class methods, col_offset is 4, the dy loses exactly 4 spaces (the class indent)
         body = self._get_code(
             body_start_line, node.end_lineno, remove_indent=node.col_offset
         )
@@ -439,8 +473,15 @@ class _ProgramVisitor(ast.NodeVisitor):
             self._add_script_segment(self._last_script_end, start_line)
             self._last_script_end = node.end_lineno
 
+            # Extract docstring
+            if isinstance(node.body[0], ast.Expr) and isinstance(
+                node.body[0].value, ast.Constant
+            ):
+                docstring = ast.literal_eval(ast.unparse(node.body[0])).strip()
+            else:
+                docstring = None
+
             # Extract class basic info
-            docstring = ast.get_docstring(node)
             bases = (
                 ", ".join([ast.unparse(base) for base in node.bases])
                 if node.bases
@@ -517,3 +558,11 @@ class _ProgramVisitor(ast.NodeVisitor):
             classes=self._classes,
             elements=self._elements,
         )
+
+
+if __name__ == "__main__":
+    with open(__file__) as f:
+        code = f.read()
+
+    code = PyProgram.from_text(code, debug=True)
+    print(code)
