@@ -51,8 +51,8 @@ class PyFunction:
         return_type = f" -> {self.return_type}" if self.return_type else ""
         function_def = f"{self.decorator}\n" if self.decorator else ""
         prefix = "async def" if self.is_async else "def"
-        function_def += f"{prefix} {self.name}({self.args}){return_type}:\n"
-        function_def = _indent_code_skip_multi_line_str(function_def, indent_str) + "\n"
+        function_def += f"{prefix} {self.name}({self.args}){return_type}:"
+        function_def = textwrap.indent(function_def, indent_str) + '\n'
 
         if self.docstring:
             # We indent the docstring. Assumes 4-space standard indentation for generation.
