@@ -33,8 +33,7 @@ class PyCodeBlock:
         return _indent_code_skip_multi_line_str(self.code, indent_str)
 
 
-# Part of PyFunction class is referenced from:
-# https://github.com/google-deepmind/funsearch/blob/main/implementation/code_manipulation.py
+# Adapted from: https://github.com/google-deepmind/funsearch/blob/main/implementation/code_manipulation.py
 @dataclasses.dataclass
 class PyFunction:
     """A parsed Python function."""
@@ -52,15 +51,24 @@ class PyFunction:
         function_def = f"{self.decorator}\n" if self.decorator else ""
         prefix = "async def" if self.is_async else "def"
         function_def += f"{prefix} {self.name}({self.args}){return_type}:"
-        function_def = textwrap.indent(function_def, indent_str) + '\n'
+        # Indent function signature
+        function_def = textwrap.indent(function_def, indent_str) + "\n"
 
         if self.docstring:
-            # We indent the docstring. Assumes 4-space standard indentation for generation.
+            # We indent the docstring. Assumes 4-space standard indentation for generation
             new_line = "\n" if self.body else ""
+            # If the docstring has multiple lines, we add a line break
+            is_multi_line_doc = len(self.docstring.splitlines()) > 1
+            docstring_end = "\n    " if is_multi_line_doc else ""
+            # Indent doc-string
             function_def += (
-                textwrap.indent(f'    """{self.docstring}"""', indent_str) + new_line
+                textwrap.indent(
+                    f'    """{self.docstring}{docstring_end}"""', indent_str
+                )
+                + new_line
             )
 
+        # Indent function body
         function_def += _indent_code_skip_multi_line_str(self.body, indent_str)
         return function_def
 
@@ -71,9 +79,12 @@ class PyFunction:
         function_def += f"{prefix} {self.name}({self.args}){return_type}:\n"
 
         if self.docstring:
-            # We indent the docstring. Assumes 4-space standard indentation for generation.
+            # We indent the docstring. Assumes 4-space standard indentation for generation
             new_line = "\n" if self.body else ""
-            function_def += f'    """{self.docstring}"""{new_line}'
+            # If the docstring has multiple lines, we add a line break
+            is_multi_line_doc = len(self.docstring.splitlines()) > 1
+            docstring_end = "\n    " if is_multi_line_doc else ""
+            function_def += f'    """{self.docstring}{docstring_end}"""{new_line}'
 
         # The body is expected to be already indented (if parsed correctly).
         # We ensure it is indented relative to the function definition.
@@ -138,13 +149,16 @@ class PyClass:
         class_def += ":\n"
 
         if self.docstring:
-            class_def += f'    """{self.docstring}"""\n'
+            # If the docstring has multiple lines, we add a line break
+            is_multi_line_doc = len(self.docstring.splitlines()) > 1
+            docstring_end = "\n    " if is_multi_line_doc else ""
+            class_def += f'    """{self.docstring}{docstring_end}"""\n\n'
 
         if self.body:
             last_item = None
             for i, item in enumerate(self.body):
                 if last_item is not None:
-                    # If there are not two consecutive PyCodeBlock intances, we add an addtional new line
+                    # If there are not two consecutive PyCodeBlock instances, we add a new line
                     if not (
                         isinstance(last_item, PyCodeBlock)
                         and isinstance(item, PyCodeBlock)
@@ -300,7 +314,7 @@ class _ProgramVisitor(ast.NodeVisitor):
 
     def _detect_multiline_strings(self, sourcecode: str) -> Set[int]:
         """Scans the source code using tokenize to identify line numbers
-        that belong to the body of multiline strings.
+        that belong to the body of multiline strings. These lines are not indented or dedented.
         """
         string_lines = set()
         # Tokenize the source code
@@ -314,15 +328,10 @@ class _ProgramVisitor(ast.NodeVisitor):
                 if end_line > start_line:
                     # Mark the lines strictly between start and end as string body
                     # The start line usually contains the assignment variable or key,
-                    # so standard indentation logic applies there
-                    for i in range(start_line + 1, end_line):
+                    # so the indent lines is between [start_line + 1, end_line],
+                    # or [start_line + 1, end_line + 1)
+                    for i in range(start_line + 1, end_line + 1):
                         string_lines.add(i)
-
-                    # Add the end line as well
-                    # Even if it only contains the closing quotes,
-                    # treating it as part of the string body prevents incorrect stripping
-                    # if the closing quotes are oddly indented
-                    string_lines.add(end_line)
 
         return string_lines
 
