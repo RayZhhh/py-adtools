@@ -7,7 +7,7 @@ Commercial use of this software or its derivatives requires prior written permis
 
 import logging
 import os
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 import openai.types.chat
 
@@ -102,6 +102,8 @@ class OpenAIAPI(LanguageModel):
             "input": text,
             "model": self._model,
         }
+        api_kwargs: Dict[str, Any]
+
         if dimensions is not None:
             api_kwargs["dimensions"] = dimensions
         if timeout_seconds is not None:

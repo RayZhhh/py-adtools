@@ -137,7 +137,7 @@ class PyEvaluatorRay(PyEvaluator):
         # Create a new Ray Actor (Sandbox)
         # Since we cannot use @ray.remote at the top level (ray is not imported yet),
         # we dynamically convert the class to a remote actor here
-        RemoteWorkerClass = ray.remote(max_concurrency=1)(_RayWorker)
+        RemoteWorkerClass = ray.remote(max_concurrency=1)(_RayWorker)  # noqa
         RemoteWorkerClass: ray.actor.ActorClass
 
         # Create the worker instance
@@ -166,7 +166,7 @@ class PyEvaluatorRay(PyEvaluator):
                 evaluate_time=time.time() - start_time,
                 error_msg="Evaluation timeout.",
             )
-        except:
+        except:  # noqa
             # Handle other runtime exceptions (syntax errors, runtime errors in code)
             if self.debug_mode:
                 print(f"DEBUG: Ray evaluation exception:\n{traceback.format_exc()}")
@@ -223,4 +223,5 @@ class _RayWorker:
         if redirect_to_devnull:
             _redirect_to_devnull()
 
+        # noinspection PyProtectedMember
         return evaluator_instance._exec_and_get_res(program_str, **kwargs)

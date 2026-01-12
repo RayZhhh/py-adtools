@@ -162,6 +162,7 @@ class PyEvaluator(ABC):
     def evaluate(self, program: str | PyProgram, **kwargs) -> EvaluationResults:
         start_time = time.time()
         error_msg = ""
+        # noinspection PyBroadException
         try:
             res = self._exec_and_get_res(program, **kwargs)
         except:
@@ -185,6 +186,7 @@ class PyEvaluator(ABC):
         if redirect_to_devnull:
             _redirect_to_devnull()
         # Evaluate and get results
+        # noinspection PyBroadException
         try:
             res = self._exec_and_get_res(program_str, **kwargs)
             # Dump the results to data
@@ -196,7 +198,8 @@ class PyEvaluator(ABC):
             )
             # Unregister the shared memory block from the resource tracker in this child process
             # The shared memory will be managed in the parent process
-            resource_tracker.unregister(name=shm_name_id, rtype="shared_memory")
+            # noinspection PyProtectedMember, PyUnresolvedReferences
+            resource_tracker.unregister(name=shm._name, rtype="shared_memory")
             # Write data
             shm.buf[: len(data)] = data
             # We only need to send back the size, as the parent already knows the name.
@@ -204,7 +207,7 @@ class PyEvaluator(ABC):
             meta_queue.put((True, len(data)))
             # Child closes its handle
             shm.close()
-        except Exception:
+        except:
             if self.debug_mode:
                 traceback.print_exc()
             # Put the exception message to the queue
@@ -231,6 +234,7 @@ class PyEvaluator(ABC):
             the return value will be (Results, Time).
         """
         # Evaluate and get results
+        # noinspection PyBroadException
         try:
             # Create a meta queue to get meta information from the evaluation process
             meta_queue = multiprocessing.Queue()
@@ -283,7 +287,7 @@ class PyEvaluator(ABC):
             return EvaluationResults(
                 result=result, evaluate_time=eval_time, error_msg=error_msg
             )
-        except Exception:
+        except:
             if self.debug_mode:
                 print(f"DEBUG: exception in shared evaluate:\n{traceback.format_exc()}")
 
@@ -302,7 +306,6 @@ class PyEvaluator(ABC):
                 shm_cleanup.close()
                 # Unlink (delete) it from the system, and close the shared memory
                 shm_cleanup.unlink()
-
             except FileNotFoundError:
                 # This is normal if the child process never reached the creation step
                 # (e.g. crashed during calculation before creating SHM)

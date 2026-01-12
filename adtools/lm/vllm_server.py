@@ -383,6 +383,8 @@ class VLLMServer(LanguageModel):
             "top_p": top_p,
             "max_tokens": max_tokens,
         }
+        data: Dict[str, Any]
+
         # Use the specified lora adapter
         if lora_name is not None:
             data["model"] = lora_name
@@ -423,9 +425,9 @@ class VLLMServer(LanguageModel):
             text = [text]
 
         # Prepare arguments for the API call
-        data = {
-            "input": text,
-        }
+        data = {"input": text}
+        data: Dict[str, Any]
+
         if dimensions is not None:
             data["dimensions"] = dimensions
 

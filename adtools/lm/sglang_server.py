@@ -364,6 +364,7 @@ class SGLangServer(LanguageModel):
             "top_p": top_p,
             "max_tokens": max_tokens,
         }
+        data: Dict[str, Any]
 
         # In SGLang OpenAI API, the 'model' parameter routes to the adapter
         if lora_name is not None:
@@ -399,6 +400,8 @@ class SGLangServer(LanguageModel):
             text = [text]
 
         data = {"input": text, "model": lora_name if lora_name else self._model_path}
+        data: Dict[str, Any]
+
         if dimensions is not None:
             data["dimensions"] = dimensions
 
