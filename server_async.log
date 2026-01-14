@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "/Users/zhangrui/Desktop/py-adtools/adtools/evaluator/zmq_auto_server.py", line 9, in <module>
-    from adtools import PyProgram, PyClass
-ModuleNotFoundError: No module named 'adtools'
