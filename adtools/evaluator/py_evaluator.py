@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Callable, List
 
 from adtools.py_code import PyProgram
-from adtools.sandbox import SandboxExecutor, EvaluationResults
+from adtools.sandbox import SandboxExecutor, ExecutionResults
 
 __all__ = [
     "PyEvaluator",
@@ -124,7 +124,7 @@ class PyEvaluator(ABC):
         )
         return res
 
-    def evaluate(self, program: str | PyProgram, **kwargs) -> EvaluationResults:
+    def evaluate(self, program: str | PyProgram, **kwargs) -> ExecutionResults:
         start_time = time.time()
         error_msg = ""
         # noinspection PyBroadException
@@ -134,7 +134,7 @@ class PyEvaluator(ABC):
             res = None
             error_msg = str(traceback.format_exc())
 
-        return EvaluationResults(
+        return ExecutionResults(
             result=res, evaluate_time=time.time() - start_time, error_msg=error_msg
         )
 
@@ -144,7 +144,7 @@ class PyEvaluator(ABC):
         timeout_seconds: int | float = None,
         redirect_to_devnull: bool = False,
         **kwargs,
-    ) -> EvaluationResults:
+    ) -> ExecutionResults:
         """Evaluate program in a new process. This enables timeout restriction and output redirection.
 
         Args:

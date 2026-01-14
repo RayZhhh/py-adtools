@@ -7,7 +7,7 @@ from typing import Dict, Callable, List, Any
 from adtools.evaluator import PyEvaluator, PyEvaluatorRay
 
 
-class SortAlgorithmEvaluator(PyEvaluatorRay):
+class SortAlgorithmEvaluator(PyEvaluator):
     def evaluate_program(
         self,
         program_str: str,

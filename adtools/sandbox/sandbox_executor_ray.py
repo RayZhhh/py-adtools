@@ -12,7 +12,7 @@ import time
 import traceback
 from typing import Any, Dict, List, Optional, Tuple
 
-from adtools.sandbox.sandbox_executor import SandboxExecutor, EvaluationResults
+from adtools.sandbox.sandbox_executor import SandboxExecutor, ExecutionResults
 from adtools.sandbox.utils import _redirect_to_devnull
 
 __all__ = ["SandboxExecutorRay"]
@@ -80,7 +80,7 @@ class SandboxExecutorRay(SandboxExecutor):
         *,
         ray_actor_options: dict[str, Any] = None,
         **kwargs,
-    ) -> EvaluationResults:
+    ) -> ExecutionResults:
         """Evaluates the program in a separate Ray Actor (process).
         This enables timeout restriction and output redirection.
 
@@ -142,7 +142,7 @@ class SandboxExecutorRay(SandboxExecutor):
                 redirect_to_devnull,
             )
             result = ray.get(future, timeout=timeout_seconds)
-            return EvaluationResults(
+            return ExecutionResults(
                 result=result,
                 evaluate_time=time.time() - start_time,
                 error_msg="",
@@ -150,7 +150,7 @@ class SandboxExecutorRay(SandboxExecutor):
         except GetTimeoutError:
             if self.debug_mode:
                 print(f"DEBUG: Ray evaluation timed out after {timeout_seconds}s.")
-            return EvaluationResults(
+            return ExecutionResults(
                 result=None,
                 evaluate_time=time.time() - start_time,
                 error_msg="Evaluation timeout.",
@@ -158,7 +158,7 @@ class SandboxExecutorRay(SandboxExecutor):
         except Exception:
             if self.debug_mode:
                 print(f"DEBUG: Ray evaluation exception:\n{traceback.format_exc()}")
-            return EvaluationResults(
+            return ExecutionResults(
                 result=None,
                 evaluate_time=time.time() - start_time,
                 error_msg=str(traceback.format_exc()),

@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Callable
 
 from adtools.py_code import PyProgram
 from adtools.evaluator.py_evaluator import PyEvaluator
-from adtools.sandbox.sandbox_executor_ray import SandboxExecutorRay, EvaluationResults
+from adtools.sandbox.sandbox_executor_ray import SandboxExecutorRay, ExecutionResults
 
 
 __all__ = ["PyEvaluatorRay"]
@@ -82,7 +82,7 @@ class PyEvaluatorRay(PyEvaluator):
         *,
         ray_actor_options: dict[str, Any] = None,
         **kwargs,
-    ) -> EvaluationResults:
+    ) -> ExecutionResults:
         """Evaluates the program in a separate Ray Actor (process).
 
         Args:

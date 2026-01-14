@@ -19,10 +19,10 @@ import psutil
 
 from adtools.sandbox.utils import _redirect_to_devnull
 
-__all__ = ["EvaluationResults", "SandboxExecutor"]
+__all__ = ["ExecutionResults", "SandboxExecutor"]
 
 
-class EvaluationResults(TypedDict):
+class ExecutionResults(TypedDict):
     result: Any
     evaluate_time: float
     error_msg: str
@@ -144,7 +144,7 @@ class SandboxExecutor:
         timeout_seconds: int | float = None,
         redirect_to_devnull: bool = False,
         **kwargs,
-    ) -> EvaluationResults:
+    ) -> ExecutionResults:
         """Evaluate program in a new process.
         This enables timeout restriction and output redirection.
 
@@ -192,7 +192,7 @@ class SandboxExecutor:
                     print(f"DEBUG: evaluation time exceeds {timeout_seconds}s.")
 
                 # Evaluation timeout happens, we return 'None' as well as the actual evaluate time
-                return EvaluationResults(
+                return ExecutionResults(
                     result=None,
                     evaluate_time=time.time() - evaluate_start_time,
                     error_msg="Evaluation timeout.",
@@ -216,14 +216,14 @@ class SandboxExecutor:
                 result = pickle.loads(buf)
                 shm.close()
 
-            return EvaluationResults(
+            return ExecutionResults(
                 result=result, evaluate_time=eval_time, error_msg=error_msg
             )
         except:
             if self.debug_mode:
                 print(f"DEBUG: exception in shared evaluate:\n{traceback.format_exc()}")
 
-            return EvaluationResults(
+            return ExecutionResults(
                 result=None,
                 evaluate_time=time.time() - evaluate_start_time,
                 error_msg=str(traceback.format_exc()),

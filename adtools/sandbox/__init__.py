@@ -1,2 +1,2 @@
-from adtools.sandbox.sandbox_executor import SandboxExecutor, EvaluationResults
+from adtools.sandbox.sandbox_executor import SandboxExecutor, ExecutionResults
 from adtools.sandbox.sandbox_executor_ray import SandboxExecutorRay
