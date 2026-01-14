@@ -8,6 +8,7 @@ Commercial use of this software or its derivatives requires prior written permis
 import multiprocessing
 import os
 import sys
+import functools
 
 from typing import Literal
 
@@ -29,3 +30,16 @@ def _redirect_to_devnull():
     with open(os.devnull, "w") as devnull:
         os.dup2(devnull.fileno(), sys.stdout.fileno())
         os.dup2(devnull.fileno(), sys.stderr.fileno())
+
+
+def execute_this_method_in_sandbox(func):
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        # Make sure the attribute exists
+        if not hasattr(self, "_sandbox_execute_method_list"):
+            self._sandbox_execute_method_list = []
+        # Record the method name
+        self._sandbox_execute_method_list.append(func.__name__)
+        return func(self, *args, **kwargs)
+
+    return wrapper

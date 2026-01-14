@@ -1,15 +1,8 @@
-# Useful tools for parsing and evaluating Python programs for algorithm design/code optimization
-
-> This repo aims to help develop more
-> powerful [Large Language Models for Algorithm Design (LLM4AD)](https://github.com/Optima-CityU/llm4ad) applications.
->
-> More tools will be provided soon.
+# Useful tools for parser, sandbox, and evaluator for LLM-aided algorithm design/code optimization
 
 ------
 
-The figure demonstrates how a Python program is parsed
-into [PyCodeBlock](./adtools/py_code.py#L18-L33), [PyFunction](./adtools/py_code.py#L38-L115), [PyClass](./adtools/py_code.py#L118-L192),
-and [PyProgram](./adtools/py_code.py#L195-L242) via `adtools`.
+The figure demonstrates how a Python program is parsed into [PyCodeBlock](./adtools/py_code.py#L18-L33), [PyFunction](./adtools/py_code.py#L38-L115), [PyClass](./adtools/py_code.py#L118-L192), and [PyProgram](./adtools/py_code.py#L195-L242) via `adtools`.
 
 ![pycode](./assets/pycode.png)
 
@@ -119,6 +112,83 @@ print(p.functions[0].name)
 - **Modify Code Elements**: Change function names, docstrings, or body content programmatically
 - **Complete Program Representation**: [PyProgram](./adtools/py_code.py#L195-L242) maintains the exact sequence of
   elements as they appear in the source code
+
+## Safe Execution with `sandbox`
+
+`adtools.sandbox` provides a secure execution environment for running untrusted code. It isolates execution in a separate process, allowing for timeout management, resource protection, and output redirection.
+
+### Basic Usage
+
+You can wrap any class or object with `SandboxExecutor` to execute its methods in a separate process.
+
+```python
+import time
+from typing import Any
+from adtools.sandbox.sandbox_executor import SandboxExecutor
+
+class SortAlgorithmEvaluator:
+    def evaluate_program(self, program: str) -> Any | None:
+        g = {}
+        exec(program, g)
+        sort_algo = g.get("merge_sort")
+        if not sort_algo: return None
+        
+        input_data = [10, 2, 4, 76, 19, 29, 3, 5, 1]
+        start = time.time()
+        res = sort_algo(input_data)
+        duration = time.time() - start
+        
+        return duration if res == sorted(input_data) else None
+
+code_generated_by_llm = """
+def merge_sort(arr):
+    if len(arr) <= 1: return arr
+    mid = len(arr) // 2
+    left = merge_sort(arr[:mid])
+    right = merge_sort(arr[mid:])
+    
+    def merge(left, right):
+        result = []
+        i = j = 0
+        while i < len(left) and j < len(right):
+            if left[i] < right[j]:
+                result.append(left[i])
+                i += 1
+            else:
+                result.append(right[j])
+                j += 1
+        result.extend(left[i:])
+        result.extend(right[j:])
+        return result
+
+    return merge(left, right)
+"""
+
+if __name__ == "__main__":
+    # Initialize SandboxExecutor with the worker instance
+    sandbox = SandboxExecutor(SortAlgorithmEvaluator(), debug_mode=True)
+
+    # Securely execute the method
+    score = sandbox.secure_execute(
+        "evaluate_program",
+        method_args=(code_generated_by_llm,),
+        timeout_seconds=10
+    )
+    print(f"Score: {score}")
+```
+
+### Sandbox Executors
+
+`adtools` provides two sandbox implementations:
+
+- **[SandboxExecutor](./adtools/sandbox/sandbox_executor.py)**
+    - Standard multiprocessing-based sandbox.
+    - Captures return values via shared memory.
+    - Supports timeout and output redirection.
+
+- **[SandboxExecutorRay](./adtools/sandbox/sandbox_executor_ray.py)**
+    - Ray-based sandbox for distributed execution.
+    - Ideal for scenarios requiring stronger isolation or cluster-based evaluation.
 
 ## Code Evaluation with `evaluator`
 
