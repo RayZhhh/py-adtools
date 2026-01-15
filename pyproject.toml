@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "py-adtools"
-version = "0.2.10"
+version = "0.3.1"
 description = "Useful tools for parsing and evaluating Python programs for LLM-based algorithm design."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -27,6 +27,9 @@ dependencies = [
 
 [project.urls]
 "Homepage" = "https://github.com/RayZhhh/py-adtools"
+
+[project.scripts]
+adtools = "adtools.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["adtools*"]
