@@ -5,33 +5,85 @@ import argparse
 import importlib.util
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Optional, Dict
+
 import requests
 
-from adtools import PyProgram, PyClass
+from adtools import PyClass
 from adtools.evaluator import PyEvaluator, PyEvaluatorRay
 
-__all__ = ["submit_code"]
+__all__ = ["submit_code", "submit_code_async"]
 
 
-def submit_code(host, port, code, timeout=10):
+def submit_code(
+    host: str,
+    port: int | str,
+    code: str,
+    timeout: Optional[float] = None,
+    *,
+    post_timeout_seconds: float = 1800,
+) -> Dict:
+    """Submit code to the evaluation server.
+
+    Args:
+        host: Server host.
+        port: Server port.
+        code: Code to submit.
+        timeout: evaluation timeout in seconds.
+        post_timeout_seconds: Post request timeout in seconds.
+
+    Returns:
+        A dict containing the evaluation metadata.
+    """
     url = f"http://{host}:{port}/"
-    req_data = {"code": code, "timeout": timeout}
+    payload = {"code": code, "timeout": timeout}
+
+    with requests.Session() as s:
+        r = s.post(url, json=payload, timeout=post_timeout_seconds)
+        r.raise_for_status()
+        return r.json()
+
+
+async def submit_code_async(
+    host: str,
+    port: int | str,
+    code: str,
+    timeout: Optional[float] = None,
+    *,
+    post_timeout_seconds: float = 1800,
+) -> Dict:
+    """Submit code to the evaluation server.
+
+    Args:
+        host: Server host.
+        port: Server port.
+        code: Code to submit.
+        timeout: evaluation timeout in seconds.
+        post_timeout_seconds: Post request timeout in seconds.
+
+    Returns:
+        A dict containing the evaluation metadata.
+    """
     try:
-        response = requests.post(url, json=req_data, timeout=timeout)
-        response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        return {
-            "result": None,
-            "evaluate_time": 0.0,
-            "error_msg": f"Request failed: {str(e)}",
-        }
+        import aiohttp
+    except ImportError:
+        raise ImportError("Please install 'aiohttp'.")
+
+    url = f"http://{host}:{port}/"
+    payload = {"code": code, "timeout": timeout}
+    timeout_cfg = aiohttp.ClientTimeout(total=post_timeout_seconds)
+
+    async with aiohttp.ClientSession(timeout=timeout_cfg) as session:
+        async with session.post(url, json=payload) as resp:
+            resp.raise_for_status()
+            return await resp.json()
 
 
 class EvaluationHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
+            self.connection.settimeout(10)
             content_length = int(self.headers.get("Content-Length", 0))
             post_data = self.rfile.read(content_length)
 
@@ -106,7 +158,7 @@ def main():
     parser.add_argument("--host", default="0.0.0.0", help="Host of the server.")
     parser.add_argument("--port", default=8000, type=int, help="Port of the server.")
     parser.add_argument(
-        "-t", "--timeout", default=10, type=float, help="Default timeout in seconds."
+        "-t", "--timeout", default=None, type=float, help="Default timeout in seconds."
     )
     parser.add_argument(
         "--max-workers", default=4, type=int, help="Max concurrent evaluations."
@@ -167,13 +219,19 @@ def main():
     # Instantiate the evaluator
     evaluator = EvaluatorClass()
 
+    # Check whether timeout is set
+    timeout_defined_in_class = None
+    for field in ["timeout_seconds, timeout, _timeout_seconds, _timeout"]:
+        if hasattr(evaluator, field):
+            timeout_defined_in_class = getattr(evaluator, field)
+
     # Initialize Threaded HTTP Server
     # We use ThreadedHTTPServer to handle requests in separate threads
     server = ThreadedHTTPServer((args.host, args.port), EvaluationHandler)
 
     # Attach shared resources to the server instance so handlers can access them
     server.evaluator = evaluator
-    server.default_timeout = args.timeout
+    server.default_timeout = args.timeout or timeout_defined_in_class
     server.semaphore = threading.Semaphore(args.max_workers)
 
     print(f"Evaluator '{public_class_name}' loaded from {args.dir}")
