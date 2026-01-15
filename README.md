@@ -1,4 +1,4 @@
-# Useful tools for parser, sandbox, and evaluator for LLM-aided algorithm design/code optimization
+# Useful code parser, sandbox, and evaluator for LLM-aided algorithm design/code optimization
 
 ------
 
