@@ -65,10 +65,15 @@ class PyEvaluator(ABC):
 
         Args:
             program_str: The raw program text.
-            callable_functions_dict: A dict maps function name to callable function.
-            callable_functions_list: A list of callable functions.
-            callable_classes_dict: A dict maps class name to callable class.
-            callable_classes_list: A list of callable classes.
+            callable_functions_dict: A dictionary where keys are the names of functions
+                defined in the `program_str` and values are the corresponding callable function objects.
+            callable_functions_list: A list of callable function objects
+                defined in the `program_str`, ordered as they appear in the program.
+            callable_classes_dict: A dictionary where keys are the names of classes
+                defined in the `program_str` and values are the corresponding callable class objects.
+            callable_classes_list: A list of callable class objects
+                defined in the `program_str`, ordered as they appear in the program.
+
         Returns:
             Returns the evaluation result.
         """
@@ -154,8 +159,7 @@ class PyEvaluator(ABC):
             **kwargs: additional keyword arguments to pass to 'evaluate_program'.
 
         Returns:
-            Returns the evaluation results. If the 'get_evaluate_time' is True,
-            the return value will be (Results, Time).
+            Returns the evaluation results.
         """
         return self.sandbox_executor.secure_execute(
             worker_execute_method_name="_exec_and_get_res",
