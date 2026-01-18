@@ -1,8 +1,9 @@
 # Useful code parser, sandbox, and evaluator for LLM-aided algorithm design/code optimization
 
-------
-
+<div align="center">
 <a href="https://deepwiki.com/RayZhhh/py-adtools"><img src="./assets/deepwiki-badge.png" alt="Ask DeepWiki.com" style="height:20px;"></a>
+</div>
+<br>
 
 The figure demonstrates how a Python program is parsed
 into [PyCodeBlock](./adtools/py_code.py#L18-L33), [PyFunction](./adtools/py_code.py#L37-L126), [PyClass](./adtools/py_code.py#L129-L206),
