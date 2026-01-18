@@ -2,7 +2,11 @@
 
 ------
 
-The figure demonstrates how a Python program is parsed into [PyCodeBlock](./adtools/py_code.py#L18-L33), [PyFunction](./adtools/py_code.py#L37-L126), [PyClass](./adtools/py_code.py#L129-L206), and [PyProgram](./adtools/py_code.py#L209-L256) via `adtools`.
+<a href="https://deepwiki.com/RayZhhh/py-adtools"><img src="./assets/deepwiki-badge.png" alt="Ask DeepWiki.com" style="height:20px;"></a>
+
+The figure demonstrates how a Python program is parsed
+into [PyCodeBlock](./adtools/py_code.py#L18-L33), [PyFunction](./adtools/py_code.py#L37-L126), [PyClass](./adtools/py_code.py#L129-L206),
+and [PyProgram](./adtools/py_code.py#L209-L256) via `adtools`.
 
 ![pycode](./assets/pycode.png)
 
@@ -115,7 +119,8 @@ print(p.functions[0].name)
 
 ## Safe Execution with `sandbox`
 
-`adtools.sandbox` provides a secure execution environment for running untrusted code. It isolates execution in a separate process, allowing for timeout management, resource protection, and output redirection.
+`adtools.sandbox` provides a secure execution environment for running untrusted code. It isolates execution in a
+separate process, allowing for timeout management, resource protection, and output redirection.
 
 ### Basic Usage
 
@@ -126,19 +131,21 @@ import time
 from typing import Any
 from adtools.sandbox.sandbox_executor import SandboxExecutor
 
+
 class SortAlgorithmEvaluator:
     def evaluate_program(self, program: str) -> Any | None:
         g = {}
         exec(program, g)
         sort_algo = g.get("merge_sort")
         if not sort_algo: return None
-        
+
         input_data = [10, 2, 4, 76, 19, 29, 3, 5, 1]
         start = time.time()
         res = sort_algo(input_data)
         duration = time.time() - start
-        
+
         return duration if res == sorted(input_data) else None
+
 
 code_generated_by_llm = """
 def merge_sort(arr):
@@ -205,13 +212,13 @@ from adtools.evaluator import PyEvaluator
 
 class SortAlgorithmEvaluator(PyEvaluator):
     def evaluate_program(
-        self,
-        program_str: str,
-        callable_functions_dict: Dict[str, Callable] | None,
-        callable_functions_list: List[Callable] | None,
-        callable_classes_dict: Dict[str, Callable] | None,
-        callable_classes_list: List[Callable] | None,
-        **kwargs,
+            self,
+            program_str: str,
+            callable_functions_dict: Dict[str, Callable] | None,
+            callable_functions_list: List[Callable] | None,
+            callable_classes_dict: Dict[str, Callable] | None,
+            callable_classes_list: List[Callable] | None,
+            **kwargs,
     ) -> Any | None:
         """Evaluate a given sort algorithm program.
         Args:
@@ -544,4 +551,6 @@ This project is licensed under the **MIT License**. See the [LICENSE](./LICENSE)
 
 ## Contact & Feedback
 
-If you have any questions, encounter bugs, or have suggestions for improvement, please feel free to [open an issue](https://github.com/RayZhhh/py-adtools/issues) or contact us. Your contributions and feedback are highly appreciated!
+If you have any questions, encounter bugs, or have suggestions for improvement, please feel free
+to [open an issue](https://github.com/RayZhhh/py-adtools/issues) or contact us. Your contributions and feedback are
+highly appreciated!
