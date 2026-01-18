@@ -2,7 +2,7 @@
 
 ------
 
-The figure demonstrates how a Python program is parsed into [PyCodeBlock](./adtools/py_code.py#L18-L33), [PyFunction](./adtools/py_code.py#L38-L144), [PyClass](./adtools/py_code.py#L147-L241), and [PyProgram](./adtools/py_code.py#L244-L280) via `adtools`.
+The figure demonstrates how a Python program is parsed into [PyCodeBlock](./adtools/py_code.py#L18-L33), [PyFunction](./adtools/py_code.py#L37-L126), [PyClass](./adtools/py_code.py#L129-L206), and [PyProgram](./adtools/py_code.py#L209-L256) via `adtools`.
 
 ![pycode](./assets/pycode.png)
 
@@ -26,9 +26,9 @@ Or install via pip:
 pip install py-adtools
 ```
 
-## Code Parsing with [py_code](./adtools/py_code.py#L1-L604)
+## Code Parsing with [py_code](./adtools/py_code.py)
 
-[adtools.py_code](./adtools/py_code.py#L1-L604) provides robust parsing of Python programs into structured components
+[adtools.py_code](./adtools/py_code.py) provides robust parsing of Python programs into structured components
 that can be easily manipulated, modified, and analyzed.
 
 ### Core Components
@@ -110,7 +110,7 @@ print(p.functions[0].name)
 - **Handles Multiline Strings**: Properly preserves multiline string content without incorrect indentation
 - **Access to Components**: Easily access functions, classes, and code blocks
 - **Modify Code Elements**: Change function names, docstrings, or body content programmatically
-- **Complete Program Representation**: [PyProgram](./adtools/py_code.py#L244-L280) maintains the exact sequence of
+- **Complete Program Representation**: [PyProgram](./adtools/py_code.py#L209-L256) maintains the exact sequence of
   elements as they appear in the source code
 
 ## Safe Execution with `sandbox`
@@ -295,19 +295,19 @@ if __name__ == "__main__":
 
 `adtools` provides two different evaluator implementations, each optimized for different scenarios:
 
-- **[PyEvaluator](./adtools/evaluator/py_evaluator.py#L20-L202)**
+- **[PyEvaluator](./adtools/evaluator/py_evaluator.py)**
     - *Uses shared memory* for extremely large return objects (e.g., large tensors)
     - *Avoids pickle serialization overhead* for massive data
     - *Best for high-performance scenarios* with very large result objects
     - *Use case*: Evaluating ML algorithms that produce large tensors or arrays
 
-- **[PyEvaluatorRay](./adtools/evaluator/py_evaluator_ray.py#L16-L123)**
+- **[PyEvaluatorRay](./adtools/evaluator/py_evaluator_ray.py)**
     - *Leverages Ray* for distributed, secure evaluation
     - *Supports zero-copy return* of large objects
     - *Ideal for cluster environments* and when maximum isolation is required
     - *Use case*: Large-scale evaluation across multiple machines or when using GPU resources
 
-All evaluators share the same interface through the abstract [PyEvaluator](./adtools/evaluator/py_evaluator.py#L20-L202)
+All evaluators share the same interface through the abstract [PyEvaluator](./adtools/evaluator/py_evaluator.py)
 class, making it easy to switch between implementations based on your specific needs.
 
 ## Practical Applications
