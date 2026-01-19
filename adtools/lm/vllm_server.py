@@ -59,7 +59,7 @@ class VLLMServer(LanguageModel):
         Args:
             model_path: Path to the model to deploy.
             tokenizer_path: Path to the tokenizer to use.
-            port: List of ports to deploy.
+            port: Port to deploy.
             gpus: List of GPUs to deploy.
             max_lora_rank: Max rank of LoRA adapter. Defaults to `None` which disables LoRA adapter.
             host: Host address for vLLM server.

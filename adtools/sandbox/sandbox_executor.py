@@ -38,14 +38,10 @@ class SandboxExecutor:
         *,
         join_timeout_seconds: int = 10,
     ):
-        """Evaluator interface for evaluating the Python algorithm program. Override this class and implement
-        'evaluate_program' method, then invoke 'self.evaluate()' or 'self.secure_evaluate()' for evaluation.
+        """Evaluator using multiprocessing for secure, isolated execution.
 
         Args:
-            exec_code: Using 'exec()' to execute the program code and obtain the callable functions and classes,
-                which will be passed to 'self.evaluate_program()'. Set this parameter to 'False' if you are going to
-                evaluate a Python scripy. Note that if the parameter is set to 'False', the arguments 'callable_...'
-                in 'self.evaluate_program()' will no longer be affective.
+            evaluate_worker: The worker object to be executed.
             find_and_kill_children_evaluation_process: If using 'self.secure_evaluate', kill children processes
                 when they are terminated. Note that it is suggested to set to 'False' if the evaluation process
                 does not start new processes.

@@ -70,6 +70,9 @@ class SandboxExecutorRay(SandboxExecutor):
                 f"Please set '{self.__class__.__name__}(..., init_ray=True)'."
             )
 
+        # Create remote worker class
+        self._RemoteWorkerClass = ray.remote(_RayWorker)
+
     def secure_execute(
         self,
         worker_execute_method_name: str,
@@ -125,11 +128,8 @@ class SandboxExecutorRay(SandboxExecutor):
         runtime_env["env_vars"] = env_vars
         ray_actor_options["runtime_env"] = runtime_env
 
-        # Create Remote Worker Class
-        RemoteWorkerClass = ray.remote(max_concurrency=1)(_RayWorker)
-
         # Create worker
-        worker = RemoteWorkerClass.options(**ray_actor_options).remote(
+        worker = self._RemoteWorkerClass.options(**ray_actor_options).remote(
             self.evaluate_worker
         )
 

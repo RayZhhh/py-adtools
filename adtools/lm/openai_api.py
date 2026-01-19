@@ -54,7 +54,7 @@ class OpenAIAPI(LanguageModel):
         *args,
         **kwargs,
     ):
-        """Send a chat completion query with OpenAI format to the vLLM server.
+        """Send a chat completion query with OpenAI format to the OpenAI-compatible server.
         Return the response content.
 
         Args:

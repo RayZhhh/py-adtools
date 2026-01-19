@@ -34,8 +34,8 @@ class PyEvaluator(ABC):
         Args:
             exec_code: Using 'exec()' to execute the program code and obtain the callable functions and classes,
                 which will be passed to 'self.evaluate_program()'. Set this parameter to 'False' if you are going to
-                evaluate a Python scripy. Note that if the parameter is set to 'False', the arguments 'callable_...'
-                in 'self.evaluate_program()' will no longer be affective.
+                evaluate a Python script. Note that if the parameter is set to 'False', the arguments 'callable_...'
+                in 'self.evaluate_program()' will no longer be effective.
             find_and_kill_children_evaluation_process: If using 'self.secure_evaluate', kill children processes
                 when they are terminated. Note that it is suggested to set to 'False' if the evaluation process
                 does not start new processes.

@@ -22,7 +22,7 @@ class LanguageModel:
         *args,
         **kwargs,
     ):
-        """Send a chat completion query with OpenAI format to the vLLM server.
+        """Send a chat completion query to the language model server.
         Return the response content.
 
         Args:

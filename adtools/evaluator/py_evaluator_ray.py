@@ -34,6 +34,8 @@ class PyEvaluatorRay(PyEvaluator):
             init_ray: Whether to initialize the ray.
             exec_code: Whether to execute the code using 'exec()'.
             debug_mode: Enable debug print statements.
+            ray_rotation_max_bytes: Max bytes for ray log rotation.
+            ray_rotation_backup_count: Backup count for ray log rotation.
         """
         super().__init__(
             exec_code=exec_code,
