@@ -1,6 +1,8 @@
 # Useful code parser, sandbox, and evaluator for LLM-aided algorithm design/code optimization
 
 <div align="center">
+<a href="https://github.com/RayZhhh/py-adtools"><img src="https://img.shields.io/github/stars/RayZhhh/py-adtools?style=social" alt="GitHub stars"></a>
+<a href="https://github.com/RayZhhh/py-adtools/blob/main/LICENSE"><img src="https://img.shields.io/github/license/RayZhhh/py-adtools" alt="License"></a>
 <a href="https://deepwiki.com/RayZhhh/py-adtools"><img src="./assets/deepwiki-badge.png" alt="Ask DeepWiki.com" style="height:20px;"></a>
 </div>
 <br>
@@ -30,6 +32,15 @@ Or install via pip:
 ```shell
 pip install py-adtools
 ```
+
+## Tutorials
+
+| Tutorial | Colab |
+| :--- | :--- |
+| **01. Code Parsing** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/RayZhhh/py-adtools/blob/main/tutorial/01_py_code.ipynb) |
+| **02. Safe Execution** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/RayZhhh/py-adtools/blob/main/tutorial/02_sandbox.ipynb) |
+| **03. Decorators** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/RayZhhh/py-adtools/blob/main/tutorial/03_decorators.ipynb) |
+| **04. Evaluators** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/RayZhhh/py-adtools/blob/main/tutorial/04_evaluator.ipynb) |
 
 ## Code Parsing with [py_code](./adtools/py_code.py)
 
@@ -197,6 +208,22 @@ if __name__ == "__main__":
 - **[SandboxExecutorRay](./adtools/sandbox/sandbox_executor_ray.py)**
     - Ray-based sandbox for distributed execution.
     - Ideal for scenarios requiring stronger isolation or cluster-based evaluation.
+
+### Decorator Usage
+
+For simpler use cases, you can use the `@sandbox_run` decorator to execute functions or methods in a sandbox automatically.
+
+```python
+from adtools.sandbox import sandbox_run
+
+@sandbox_run(timeout=5.0)
+def calculate(x):
+    return x ** 2
+
+# Executed in a separate process
+res = calculate(10)
+print(f"Result: {res['result']}, Time: {res['evaluate_time']}")
+```
 
 ## Code Evaluation with `evaluator`
 

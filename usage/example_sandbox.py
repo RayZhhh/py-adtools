@@ -1,12 +1,11 @@
 import sys
 
+from adtools.sandbox import SandboxExecutorRay
 from adtools.sandbox.sandbox_executor import SandboxExecutor
 
 sys.path.append("../")
 import time
 from typing import Dict, Callable, List, Any
-
-from adtools.evaluator import PyEvaluator, PyEvaluatorRay
 
 
 class SortAlgorithmEvaluator:
@@ -63,8 +62,9 @@ def merge_sort(arr):
         pass
 """
 
+
 if __name__ == "__main__":
-    sandbox = SandboxExecutor(SortAlgorithmEvaluator(), debug_mode=True)
+    sandbox = SandboxExecutorRay(SortAlgorithmEvaluator(), debug_mode=True)
     score = sandbox.secure_execute(
         "evaluate_program",
         method_args=(code_generated_by_llm,),
