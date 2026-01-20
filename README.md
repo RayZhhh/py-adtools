@@ -1,5 +1,7 @@
 # Useful code parser, sandbox, and evaluator for LLM-aided algorithm design/code optimization
 
+[中文版](./README_zh.md)
+
 <div align="center">
 <a href="https://github.com/RayZhhh/py-adtools"><img src="https://img.shields.io/github/stars/RayZhhh/py-adtools?style=social" alt="GitHub stars"></a>
 <a href="https://github.com/RayZhhh/py-adtools/blob/main/LICENSE"><img src="https://img.shields.io/github/license/RayZhhh/py-adtools" alt="License"></a>

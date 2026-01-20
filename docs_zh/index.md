@@ -31,4 +31,4 @@ Py-ADTools 促进了一个闭环工作流：
 
 ## 快速开始
 
-查看 [安装指南](./installation.md) 进行设置，或探索 README 中的 [教程](../README_zh.md#教程)。
+查看 [安装指南](./installation.md) 进行设置，或探索 README 中的 [教程](../README_ZH.md#教程)。
