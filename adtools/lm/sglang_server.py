@@ -1,8 +1,7 @@
 """
 Copyright (c) 2025 Rui Zhang <rzhang.cs@gmail.com>
 
-NOTICE: This code is under MIT license. This code is intended for academic/research purposes only.
-Commercial use of this software or its derivatives requires prior written permission.
+NOTICE: This code is under MIT license.
 """
 
 from typing import Optional, List, Literal, Dict, Any

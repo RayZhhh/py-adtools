@@ -1,8 +1,7 @@
 """
 Copyright (c) 2025 Rui Zhang <rzhang.cs@gmail.com>
 
-NOTICE: This code is under MIT license. This code is intended for academic/research purposes only.
-Commercial use of this software or its derivatives requires prior written permission.
+NOTICE: This code is under MIT license.
 """
 
 import multiprocessing
@@ -91,7 +90,7 @@ class SandboxExecutor:
         if redirect_to_devnull:
             _redirect_to_devnull()
 
-        if hasattr(self.evaluate_worker, worker_execute_method_name):  # todo
+        if hasattr(self.evaluate_worker, worker_execute_method_name):
             method_to_call = getattr(self.evaluate_worker, worker_execute_method_name)
         else:
             raise RuntimeError(
