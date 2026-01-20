@@ -1,84 +1,87 @@
-# Code Evaluation Framework
+# Evaluator Implementation Analysis
 
-The `adtools.evaluator` module builds upon the sandbox layer to provide a structured workflow for testing and scoring code. It abstracts away the complexity of "compiling" string code into executable functions and managing the sandbox lifecycle.
+The `adtools.evaluator` module acts as the bridge between raw string code and the sandbox execution environment.
 
-## The Architecture: `PyEvaluator`
+## 1. `PyEvaluator`: The Compilation Pipeline
 
-The core class is `PyEvaluator`. It implements the **Template Method** design pattern to separate the *execution mechanics* from the *evaluation logic*.
+The base class `PyEvaluator` defines the template for converting string code into executable Python objects.
 
-### 1. The Execution Flow
+### 1.1 `_exec_and_get_res`
 
-When you call `evaluator.secure_evaluate(code_str)`, the following pipeline executes:
-
-1.  **Sandbox Entry**: A new process (or Ray actor) is spawned.
-2.  **Compilation (`_exec_and_get_res`)**:
-    *   The raw `code_str` is parsed using `PyProgram`.
-    *   The code is executed via Python's `exec()` command within a restricted local namespace.
-    *   The framework extracts all `callable` objects (functions, classes) from this namespace.
-3.  **User Logic (`evaluate_program`)**:
-    *   The framework calls your custom implementation of `evaluate_program`.
-    *   **Crucially**, it passes the *executable function objects*, not just the source text. You don't need to manually `exec` or parse strings; you just call `func(input)`.
-4.  **Result Return**: The result from your method is serialized and returned to the main process.
-
-### 2. Why this Design?
-
-- **Safety**: The potentially dangerous `exec()` happens strictly inside the sandbox.
-- **Convenience**: Your evaluation logic deals with standard Python objects. You can write `my_algo(data)` instead of messing with `subprocess.run` or string parsing.
-- **Flexibility**: You can inject dependencies (datasets, helper functions) into the `evaluate_program` method.
-
-## Implementing a Custom Evaluator
-
-You must inherit from `PyEvaluator` (or `PyEvaluatorRay`) and implement `evaluate_program`.
+This is the internal method that runs **inside the sandbox**.
 
 ```python
-from adtools.evaluator import PyEvaluator
+# adtools/evaluator/py_evaluator.py
 
-class MathEvaluator(PyEvaluator):
-    def evaluate_program(
-        self,
-        program_str: str,
-        callable_functions_dict: dict,
+def _exec_and_get_res(self, program: str | PyProgram, **kwargs):
+    # 1. Parse program to find names
+    if isinstance(program, str):
+        program = PyProgram.from_text(program)
+    function_names = [f.name for f in program.functions]
+    
+    # 2. Execute Code (Compilation)
+    if self.exec_code:
+        all_globals_namespace = {}
+        # This executes the script, defining functions/classes in the dict
+        exec(str(program), all_globals_namespace)
+        
+        # 3. Extract Callables
+        callable_funcs_dict = {
+            name: all_globals_namespace[name] 
+            for name in function_names
+        }
+    else:
+        callable_funcs_dict = None
+
+    # 4. Delegate to User Logic
+    res = self.evaluate_program(
+        str(program),
+        callable_functions_dict=callable_funcs_dict,
+        # ... other args
         **kwargs
-    ):
-        # 1. Retrieve the function to test
-        # The framework has already 'exec'ed the code and populated this dict
-        func = callable_functions_dict.get("square")
-        if not func:
-            return 0.0 # Fail if function missing
-
-        # 2. Run your test logic
-        try:
-            result = func(10)
-            return 1.0 if result == 100 else 0.0
-        except Exception:
-            return 0.0
+    )
+    return res
 ```
 
-## Evaluator Variants
+**Implementation Insight**:
+- **Why parse first?** We parse the code to know exactly *which* functions and classes are defined in it (`function_names`). This allows us to selectively extract them from the `all_globals_namespace` after `exec()`.
+- **Dependency Injection**: The `evaluate_program` method (implemented by the user) receives the ready-to-use `callable_functions_dict`. This means the user's code doesn't need to do `exec` or parsing; it simply retrieves `func = dict['my_func']` and calls `func()`.
 
-### `PyEvaluator` (Process-Based)
-Uses `SandboxExecutor`. It is the default choice for most tasks.
-- **Pros**: Lightweight, no external dependencies (like Ray).
-- **Cons**: Data transfer (pickling) has some overhead for massive objects.
+### 1.2 `secure_evaluate`
 
-### `PyEvaluatorRay` (Ray-Based)
-Uses `SandboxExecutorRay`.
-- **Pros**: Zero-copy data transfer, distributed execution, easy GPU access.
-- **Cons**: Requires installing and initializing Ray.
-
-## Secure Evaluation
-
-Always use `secure_evaluate` in production or when handling LLM code.
+This is the public method called by the main application.
 
 ```python
-evaluator = MathEvaluator()
+# adtools/evaluator/py_evaluator.py
 
-# secure_evaluate handles the process creation, timeout, and cleanup
-results = evaluator.secure_evaluate(
-    "def square(x): return x*x",
-    timeout_seconds=2.0
-)
-
-print(f"Result: {results['result']}")
-print(f"Time: {results['evaluate_time']}")
+def secure_evaluate(self, program, timeout_seconds=None, ...):
+    return self.sandbox_executor.secure_execute(
+        worker_execute_method_name="_exec_and_get_res",
+        method_args=[program],
+        method_kwargs=kwargs,
+        timeout_seconds=timeout_seconds,
+        # ...
+    )
 ```
+
+**Implementation Insight**:
+- It doesn't run `_exec_and_get_res` directly.
+- Instead, it tells the `sandbox_executor` to run `_exec_and_get_res` in the child process.
+- The `program` string is pickled and sent to the child.
+- The child runs `exec()`, then runs `evaluate_program()`, then pickles the result back.
+
+## 2. `PyEvaluatorRay`: Distributed Variant
+
+Inherits from `PyEvaluator` but initializes a `SandboxExecutorRay` instead of the standard one.
+
+```python
+# adtools/evaluator/py_evaluator_ray.py
+
+class PyEvaluatorRay(PyEvaluator):
+    def __init__(self, ...):
+        # ...
+        self.sandbox_executor = SandboxExecutorRay(...)
+```
+
+**Implementation Insight**:
+- Since it shares the same `_exec_and_get_res` method from the parent class, the compilation logic is identical. The only difference is *where* that method runs (Ray Actor vs. Subprocess).

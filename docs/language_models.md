@@ -1,72 +1,92 @@
-# Language Model Interface
+# Language Model Implementation Analysis
 
-The `adtools.lm` module provides a unified abstraction for interacting with Large Language Models (LLMs). It handles the complexity of connecting to remote APIs (OpenAI) or managing the lifecycle of local high-performance inference servers (vLLM, SGLang).
+The `adtools.lm` module standardizes interactions with both remote APIs and local inference engines.
 
-## 1. Unified Abstraction (`LanguageModel`)
+## 1. `VLLMServer`: The Manager Pattern
 
-**Implementation Idea**:
-To switch between different backends (e.g., prototyping with GPT-4, production with local Llama-3) without changing your application logic, `LanguageModel` enforces a standard interface.
+`VLLMServer` wraps the `vllm` library's API server. Instead of just being a client, it manages the server process itself.
 
-```python
-class LanguageModel:
-    def chat_completion(self, message, max_tokens, ...): ...
-    def embedding(self, text, ...): ...
-```
-
-This polymorphism allows your main algorithm to just accept a `LanguageModel` instance and work regardless of the backend.
-
-## 2. Remote APIs (`OpenAIAPI`)
-
-**Implementation Idea**:
-A lightweight wrapper around the official `openai` Python client. It handles environment variable resolution (`OPENAI_API_KEY`, `OPENAI_BASE_URL`) and standardizes the input/output formats to match the `LanguageModel` interface.
+### 1.1 Launching the Server
 
 ```python
-from adtools.lm import OpenAIAPI
-llm = OpenAIAPI(model="gpt-4", api_key="sk-...")
+# adtools/lm/vllm_server.py
+
+def _launch_vllm(self, detach: bool = False):
+    # 1. Construct Command Line
+    cmd = [
+        sys.executable, "-m", "vllm.entrypoints.openai.api_server",
+        "--model", self._model_path,
+        "--port", str(self._port),
+        "--tensor-parallel-size", str(len(self._gpus)),
+        # ... other args
+    ]
+    
+    # 2. Configure Environment
+    env = os.environ.copy()
+    env["CUDA_VISIBLE_DEVICES"] = ",".join(map(str, self._gpus))
+    
+    # 3. Spawn Process
+    proc = subprocess.Popen(
+        cmd, 
+        env=env, 
+        stdout=subprocess.DEVNULL if self._silent_mode else None,
+        # ...
+    )
+    return proc
 ```
 
-## 3. Local Inference Servers (`VLLMServer`, `SGLangServer`)
+**Implementation Insight**:
+- We invoke `vllm` via `python -m vllm...` rather than importing it directly in the main process. This is critical because `vllm` initializes CUDA contexts and allocates massive GPU memory. By keeping it in a subprocess, we ensure that:
+    1.  We can cleanly kill it (`kill()`) to free memory.
+    2.  It doesn't conflict with other GPU libraries in the main process.
 
-**Implementation Idea: The "Manager" Pattern**
+### 1.2 Health Check Loop
 
-Unlike `OpenAIAPI` which connects to an existing server, `VLLMServer` and `SGLangServer` are designed to **manage** the server process itself. They turn a Python script into a self-contained deployment unit.
-
-### Key Implementation Details:
-
-1.  **Subprocess Launch**:
-    When you initialize `VLLMServer`, it constructs a command-line string (invoking `vllm.entrypoints.openai.api_server`) and launches it using `subprocess.Popen`. This runs the heavy inference engine in a separate process, isolated from your main Python logic.
-
-2.  **Health Check & Waiting**:
-    The constructor doesn't return immediately. It enters a `_wait_for_server()` loop, polling the server's `/health` endpoint via HTTP. This ensures that when your code proceeds, the model is fully loaded and ready to accept requests.
-
-3.  **Lifecycle Management**:
-    These classes implement `close()` (and `__del__`) to robustly terminate the server subprocess. They use `psutil` to kill the entire process tree, ensuring no GPU memory is leaked if your script crashes.
-
-4.  **Dynamic LoRA Support**:
-    Both classes provide pythonic wrappers (`load_lora_adapter`, `unload_lora_adapter`) around the underlying server's HTTP management endpoints. This allows you to hot-swap fine-tuned adapters at runtime without restarting the heavy base model.
-
-### Usage Example (vLLM)
+After launching, we can't send requests immediately. The model takes time to load (tens of seconds).
 
 ```python
-from adtools.lm import VLLMServer
+# adtools/lm/vllm_server.py
 
-# 1. Launch Server (This blocks until the model is loaded)
-# It effectively runs: `python -m vllm... --model meta-llama...` in background
-llm = VLLMServer(
-    model_path="meta-llama/Meta-Llama-3-8B-Instruct",
-    port=8000,
-    gpus=[0]
-)
+def _wait_for_server(self):
+    for _ in range(self._deploy_timeout_seconds):
+        # 1. Check if process died
+        if self._vllm_server_process.poll() is not None:
+             sys.exit(f"vLLM crashed with code {self._vllm_server_process.returncode}")
 
-# 2. Use it (Standard Interface)
-print(llm.chat_completion("Hello!"))
-
-# 3. Dynamic LoRA Loading
-# Sends a POST request to the vLLM server to load weights
-llm.load_lora_adapter("math_adapter", "/path/to/lora/weights")
-print(llm.chat_completion("Solve this equation", lora_name="math_adapter"))
-
-# 4. Cleanup
-# Kills the background vLLM process and frees GPU memory
-llm.close()
+        # 2. Check HTTP Health Endpoint
+        try:
+            if requests.get(f"http://{host}:{port}/health").status_code == 200:
+                return  # Ready!
+        except:
+            pass
+            
+        time.sleep(1)
+        
+    # Timeout
+    self._kill_vllm_process()
+    sys.exit("Failed to start")
 ```
+
+### 1.3 Dynamic LoRA Loading
+
+The server runs continuously, but we might want to change the LoRA adapter. We use vLLM's internal API for this.
+
+```python
+# adtools/lm/vllm_server.py
+
+def load_lora_adapter(self, lora_name, path):
+    payload = {"lora_name": lora_name, "lora_path": path}
+    url = f"http://{host}:{port}/v1/load_lora_adapter"
+    
+    # Send request to the running subprocess
+    requests.post(url, json=payload)
+```
+
+**Implementation Insight**:
+- This leverages the fact that `vllm` exposes LoRA management endpoints. By wrapping these in a Python method, we make it feel like a local function call, hiding the HTTP complexity.
+
+## 2. `SGLangServer`
+
+The implementation of `SGLangServer` is structurally identical to `VLLMServer`, but it invokes `sglang.launch_server` and uses SGLang-specific arguments (like `--mem-fraction-static`).
+
+It serves as a drop-in replacement: you can swap `VLLMServer` with `SGLangServer` in your code, and the `chat_completion` methods will work exactly the same way.

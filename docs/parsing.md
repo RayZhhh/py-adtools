@@ -1,106 +1,145 @@
-# Code Parsing
+# Code Parsing Implementation Analysis
 
-The `adtools.py_code` module is the foundation of the library, designed to transform raw Python source code into structured, manipulatable objects. Unlike simple string manipulation, it leverages Python's Abstract Syntax Tree (AST) to ensure syntactical correctness while preserving formatting, comments, and structure.
+The `adtools.py_code` module implements a **round-trip** parser: it can parse Python code into objects and reconstruct it back to a string that is semantically equivalent to the original (preserving comments and formatting).
 
-## Core Design Philosophy
+This document analyzes the source code implementation of the core components.
 
-The parsing logic is built around the `ast` module and `tokenize` library. The primary goal is to **decompose** a Python file into high-level logical blocks—Functions, Classes, and arbitrary Code Blocks (imports, global variables)—so they can be individually modified (e.g., renaming a function, changing a docstring) and then **reconstructed** back into valid Python code.
+## 1. `_ProgramVisitor`: The Parsing Engine
 
-### The Parsing Process
+The heavy lifting is done by `_ProgramVisitor`, which inherits from Python's built-in `ast.NodeVisitor`. Instead of just traversing the AST, it uses the AST nodes to identify **where** components start and end (line numbers), and then extracts the raw text from the source code.
 
-1.  **AST Traversal**: The code is parsed into an AST. A custom `_ProgramVisitor` (inheriting from `ast.NodeVisitor`) traverses this tree.
-2.  **Segment Identification**: The visitor identifies top-level nodes:
-    *   `FunctionDef` and `AsyncFunctionDef` become `PyFunction`.
-    *   `ClassDef` becomes `PyClass`.
-    *   Gaps between these definitions (imports, assignments, comments) are captured as `PyCodeBlock`.
-3.  **Indentation Handling**: One of the most complex aspects is handling indentation. The parser calculates the column offset of nodes and strips strictly necessary indentation when extracting function/class bodies, ensuring that the extracted code is valid (dedented). When reconstructing, it re-applies indentation based on the hierarchy.
-4.  **Preservation**: It uses `tokenize` to detect multiline strings to avoid incorrectly stripping indentation from within string literals (e.g., SQL queries or large text blocks inside code).
+### 1.1 Multiline String Detection
 
-## Class Reference & Implementation Details
-
-### 1. `PyProgram`
-
-**Implementation Idea**: Acts as the container for the entire file. It maintains a list of `elements` which preserves the exact order of `PyFunction`, `PyClass`, and `PyCodeBlock` objects as they appeared in the source.
+A major challenge in parsing Python code is distinguishing between "indentation" and "content inside a multiline string".
 
 ```python
-@dataclasses.dataclass
-class PyProgram:
-    scripts: List[PyCodeBlock]   # Code blocks outside functions/classes
-    functions: List[PyFunction]  # Top-level functions
-    classes: List[PyClass]       # Top-level classes
-    elements: List[Union[PyFunction, PyClass, PyCodeBlock]] # Ordered list of all elements
+# adtools/py_code.py
 
-    def __str__(self) -> str:
-        # Reconstruction: Concatenates the string representation of all elements
-        program = ""
-        for item in self.elements:
-            program += str(item) + "\n\n"
-        return program.strip()
+def _detect_multiline_strings(self, sourcecode: str) -> Set[int]:
+    """Scans the source code using tokenize to identify line numbers..."""
+    string_lines = set()
+    tokens = tokenize.tokenize(BytesIO(sourcecode.encode("utf-8")).readline)
+    for token in tokens:
+        if token.type == tokenize.STRING:
+            start_line, _ = token.start
+            end_line, _ = token.end
+            # If start_line != end_line, it is a multiline string
+            if end_line > start_line:
+                # Mark lines within the string
+                for i in range(start_line + 1, end_line + 1):
+                    string_lines.add(i)
+    return string_lines
 ```
 
-### 2. `PyFunction`
+**Implementation Insight**:
+- We use the `tokenize` library (lexer) rather than the AST parser here because AST loses exact line mapping of multiline strings in some python versions or doesn't easily distinguish them from code blocks.
+- We store the line numbers in a `set`. Later, when we "dedent" (remove indentation) from a function body, we check this set. If a line is inside a multiline string, we **do not** strip its whitespace, preserving the string's content.
 
-**Implementation Idea**: Encapsulates a function definition. It separates the signature (name, args, decorators, return type) from the body and docstring. This allows you to modify the body (e.g., injecting new logic) without worrying about the function header, or rename the function without regex.
+### 1.2 Code Extraction and Dedenting
 
-**Key Attributes**:
-- `body`: The function body text, **dedented** (indentation removed) so it looks like top-level code.
-- `docstring`: Extracted separately to allow easy modification or removal (e.g., to save context window in LLMs).
+When we extract a function body, we need to remove the indentation relative to the function definition so it looks like a top-level block.
 
 ```python
-func = program.functions[0]
-func.name = "new_name"           # Modify name
-func.docstring = None            # Remove docstring
-func.decorator = None            # Remove decorators
-print(func)                      # Reconstructs the function with changes
+# adtools/py_code.py
+
+def _get_code(self, start_line: int, end_line: int, remove_indent: int = 0) -> str:
+    # ...
+    for idx, line in enumerate(lines):
+        current_lineno = start_line + idx + 1
+        
+        # Check if line is inside a multiline string (protected)
+        if current_lineno in self._multiline_string_lines:
+            dedented_lines.append(line)
+        else:
+            # For normal code, strip the indentation (col_offset)
+            if len(line) >= remove_indent and line[:remove_indent].isspace():
+                dedented_lines.append(line[remove_indent:])
+            else:
+                dedented_lines.append(line)
+    return "\n".join(dedented_lines).rstrip()
 ```
 
-### 3. `PyClass`
+**Implementation Insight**:
+- `remove_indent` comes from `node.col_offset` provided by the AST.
+- If we didn't protect multiline strings, a docstring like this:
+    ```python
+    def foo():
+        """
+        Line 1
+        Line 2
+        """
+    ```
+    Might lose the indentation of "Line 1" and "Line 2", breaking formatting.
 
-**Implementation Idea**: Similar to `PyFunction`, but for classes. It acts as a recursive container. A `PyClass` contains its own list of `functions` (methods) and `body` (which can contain nested `PyCodeBlock` for class attributes or inner classes).
+### 1.3 Visiting Functions (`visit_FunctionDef`)
 
-**Indentation Management**:
-When a method is extracted from a class, the parser removes the class-level indentation (usually 4 spaces) from the method's definition. When the `PyClass` is converted back to a string, it re-indents all its children.
-
-### 4. `PyCodeBlock`
-
-**Implementation Idea**: Represents everything that isn't a function or a class. This includes:
-- Import statements (`import os`)
-- Global variable assignments (`x = 1`)
-- `if __name__ == "__main__":` blocks
-
-This ensures that `PyProgram` covers 100% of the source code, not just the functions and classes.
-
-## Example: Parsing and Modifying
+When the visitor encounters a function:
 
 ```python
-from adtools import PyProgram
+# adtools/py_code.py
 
-source_code = """
-import math
+def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+    if node.col_offset == 0:  # We only care about top-level functions here
+        # 1. Capture the "Gap" (Script) before this function
+        start_line = node.lineno - 1
+        if hasattr(node, "decorator_list") and node.decorator_list:
+            start_line = min(d.lineno for d in node.decorator_list) - 1
+        
+        self._add_script_segment(self._last_script_end, start_line)
+        self._last_script_end = node.end_lineno
 
-def calculate_circle_area(radius):
-    """Returns the area of a circle."""
-    return math.pi * radius ** 2
-"""
-
-# 1. Parse
-program = PyProgram.from_text(source_code)
-
-# 2. Inspect
-func = program.functions[0]
-print(f"Original Name: {func.name}")
-
-# 3. Modify
-func.name = "get_area"
-func.docstring = "Calculates area."
-
-# 4. Reconstruct
-# The __str__ method automatically reassembles the code
-print(program)
-# Output:
-# import math
-#
-# def get_area(radius):
-#     """Calculates area."""
-#     return math.pi * radius ** 2
+        # 2. Extract function info
+        func = self._extract_function_info(node)
+        self._functions.append(func)
 ```
+
+**Implementation Insight**:
+- `_last_script_end` tracks where the previous element ended.
+- Everything between the last element and the current function (e.g., imports, comments) is captured as a `PyCodeBlock` via `_add_script_segment`.
+- This ensures 100% coverage of the source file.
+
+## 2. `PyFunction` and `PyClass` Reconstruction
+
+These classes act as containers. Their complexity lies in **reconstruction** (`__str__`).
+
+### 2.1 Rebuilding a Function
+
+```python
+# adtools/py_code.py within PyFunction
+
+def _to_str(self, indent_str=""):
+    # ...
+    # Reconstruct signature
+    function_def += f"{prefix} {self.name}({self.args}){return_type}:"
+    
+    # Reconstruct Docstring
+    if self.docstring:
+         function_def += textwrap.indent(f'"""{self.docstring}"""', indent_str)
+    
+    # Reconstruct Body
+    # The body is stored 'dedented'. We must indent it back.
+    function_def += _indent_code_skip_multi_line_str(self.body, indent_str)
+    return function_def
+```
+
+**Implementation Insight**:
+- We use `_indent_code_skip_multi_line_str` again during reconstruction. This is the inverse of the logic in extraction. It ensures that while we add indentation to code lines, we don't double-indent the contents of multiline strings.
+
+## 3. `PyProgram` Wrapper
+
+```python
+# adtools/py_code.py
+
+@classmethod
+def from_text(cls, text: str, debug=False) -> Optional["PyProgram"]:
+    try:
+        tree = ast.parse(text)
+        visitor = _ProgramVisitor(text)
+        visitor.visit(tree)
+        return visitor.return_program()
+    except:
+        # ...
+```
+
+**Implementation Insight**:
+- It acts as the entry point. It instantiates the visitor, runs the pass, and collects the lists of scripts, functions, and classes into the final object.

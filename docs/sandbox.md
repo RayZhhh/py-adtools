@@ -1,85 +1,197 @@
-# Safe Execution (Sandbox)
+# Sandbox Implementation Analysis
 
-The `adtools.sandbox` module provides the mechanism for safely executing untrusted code. It isolates the execution environment to prevent crashes, infinite loops, or malicious interference from affecting the main application.
+The `adtools.sandbox` module ensures safe execution. This document analyzes the low-level implementation of process management and data transfer.
 
-## 1. Process-Based Sandbox (`SandboxExecutor`)
+## 1. `SandboxExecutor`: Process Isolation
 
-**Implementation Idea**:
-The `SandboxExecutor` relies on Python's `multiprocessing` module to run code in a separate operating system process. The challenge in multiprocess execution is robustly handling return values (especially large ones) and timeouts.
+The core challenge is executing a method in a separate process and getting the result back efficiently.
 
-### Mechanism: Shared Memory & Queues
-
-Instead of passing large results back through a simple `Queue` (which involves slow pickling/unpickling and pipe size limits), `SandboxExecutor` uses a hybrid approach:
-
-1.  **Shared Memory**: The child process allocates a `multiprocessing.shared_memory.SharedMemory` block. It serializes the result using `pickle` and writes the raw bytes directly into this memory block.
-2.  **Metadata Queue**: The child process sends a small tuple `(success, size_or_error)` to the parent via a `multiprocessing.Queue`.
-3.  **Zero-Copy Retrieval**: The parent reads the metadata, attaches to the specified shared memory block, and reconstructs the object.
-
-This design minimizes overhead for large data structures (like matrices or large lists).
-
-### Timeout & Process Management
-
-- **Timeout**: The parent process waits on the `Queue.get()` with a `timeout` argument. If it times out, the parent immediately proceeds to terminate the child.
-- **Cleanup**: To ensure no zombie processes are left behind (e.g., if the user code spawns its own subprocesses), the executor uses `psutil` to find and kill the entire process tree of the child process.
+### 1.1 The Secure Execution Flow
 
 ```python
-from adtools.sandbox import SandboxExecutor
+# adtools/sandbox/sandbox_executor.py
 
-# Wrap your worker object
-executor = SandboxExecutor(my_worker_instance)
+def secure_execute(self, ...):
+    # 1. Create a communication channel (Queue)
+    meta_queue = multiprocessing.Queue()
+    
+    # 2. Create a unique name for Shared Memory
+    unique_shm_name = f"psm_{uuid.uuid4().hex[:8]}"
 
-# Execute 'my_method' in a separate process with a 5s timeout
-result = executor.secure_execute(
-    "my_method",
-    method_args=(10, 20),
-    timeout_seconds=5.0
-)
+    # 3. Launch the child process
+    process = multiprocessing.Process(
+        target=self._execute_and_put_res_in_shared_memory,
+        args=(..., meta_queue, unique_shm_name),
+    )
+    process.start()
+
+    # 4. Wait for result with timeout
+    try:
+        # Blocks here until timeout
+        meta = meta_queue.get(timeout=timeout_seconds)
+    except Empty:
+        # Timeout occurred!
+        return ExecutionResults(result=None, error_msg="Evaluation timeout.")
+    finally:
+        # 5. Cleanup regardless of outcome
+        self._kill_process_and_its_children(process)
+        # Unlink shared memory
+        # ...
 ```
 
-## 2. Ray-Based Sandbox (`SandboxExecutorRay`)
+**Implementation Insight**:
+- We pass `unique_shm_name` to the child. The child *creates* the shared memory, but the parent dictates the name. This allows the parent to clean it up (unlink) even if the child crashes or is killed before it can clean up itself.
 
-**Implementation Idea**:
-For distributed or cluster-based environments, `SandboxExecutorRay` leverages the [Ray](https://github.com/ray-project/ray) framework. Ray Actors provide a more natural isolation boundary than raw processes and offer advanced features like GPU assignment.
+### 1.2 The Child Process Logic
 
-### Mechanism: Actors & Object Store
-
-1.  **Actor Creation**: The executor creates a Ray Actor (`@ray.remote` class) that wraps your worker object. This actor runs in its own process (potentially on a different node).
-2.  **Execution**: The method call is dispatched asynchronously using `actor.method.remote()`.
-3.  **Result Retrieval**: The parent waits for the result using `ray.get(future, timeout=...)`. Ray's Plasma Object Store handles the data transfer, offering **zero-copy** reads for large NumPy arrays and Tensors.
-
-### Resource Management
-
-Ray automatically manages the lifecycle of actors. If `timeout_seconds` is exceeded during `ray.get`, the `SandboxExecutorRay` catches the `GetTimeoutError` and forcibly kills the actor using `ray.kill(worker, no_restart=True)`.
+This method runs inside the isolated process.
 
 ```python
-from adtools.sandbox import SandboxExecutorRay
+# adtools/sandbox/sandbox_executor.py
 
-# Automatically initializes Ray if needed
-executor = SandboxExecutorRay(my_worker_instance, init_ray=True)
+def _execute_and_put_res_in_shared_memory(self, ..., shm_name_id):
+    # 1. Output Redirection
+    if redirect_to_devnull:
+        _redirect_to_devnull()  # os.dup2(devnull, sys.stdout)
 
-# Execute remotely
-result = executor.secure_execute("my_method", timeout_seconds=5.0)
+    try:
+        # 2. Execute User Code
+        res = method_to_call(*args, **kwargs)
+
+        # 3. Serialize
+        data = pickle.dumps(res, protocol=pickle.HIGHEST_PROTOCOL)
+
+        # 4. Write to Shared Memory
+        # create=True tells OS to allocate memory
+        shm = shared_memory.SharedMemory(create=True, name=shm_name_id, size=len(data))
+        
+        # Unregister from resource_tracker to prevent Python from complaining 
+        # when this process exits but memory is still held by parent.
+        resource_tracker.unregister(name=shm._name, rtype="shared_memory")
+
+        # Copy bytes
+        shm.buf[:len(data)] = data
+        
+        # 5. Notify Parent
+        # We send (True, size) so parent knows how many bytes to read
+        meta_queue.put((True, len(data)))
+        
+    except:
+        # Send exception string back
+        meta_queue.put((False, str(traceback.format_exc())))
 ```
 
-## 3. Decorators (`@sandbox_run`)
+**Implementation Insight**:
+- **Resource Tracker Hack**: Python's `multiprocessing` has a `resource_tracker` that cleans up leaked shared memory. However, since we want the *parent* to read the memory after the *child* exits, we must explicitly `unregister` it in the child; otherwise, Python might delete the memory block as soon as the child process ends, causing a segfault or FileNotFoundError in the parent.
 
-**Implementation Idea**:
-The `@sandbox_run` decorator is a syntactic sugar that automates the creation of an executor. It inspects the decorated function:
-- **For Methods**: It detects `self`. It creates a shallow copy of the instance to pass to the sandbox (preventing race conditions on the original object state).
-- **For Functions**: It wraps the function in a temporary worker class.
+### 1.3 Process Cleanup
 
-It allows you to seamlessly "offload" a specific function to a sandbox without refactoring your entire class structure.
+Simply calling `process.terminate()` isn't enough if the user code spawned its own subprocesses (zombies).
 
 ```python
-from adtools.sandbox import sandbox_run
+# adtools/sandbox/sandbox_executor.py
 
-@sandbox_run(timeout=2.0)
-def risky_calculation(x):
-    import time
-    time.sleep(1)
-    return x * x
-
-# Calling this automatically spawns a process, runs the code, and returns the result
-res = risky_calculation(5)
-print(res['result'])  # 25
+def _kill_process_and_its_children(self, process):
+    if self.find_and_kill_children_evaluation_process:
+        try:
+            parent = psutil.Process(process.pid)
+            children = parent.children(recursive=True)
+        except psutil.NoSuchProcess:
+            children = []
+            
+    process.terminate()
+    # ... join ...
+    
+    for child in children:
+        child.terminate()
 ```
+
+**Implementation Insight**:
+- We use `psutil` to inspect the process tree and kill all descendants recursively. This prevents "orphan" processes from accumulating on the server.
+
+## 2. `SandboxExecutorRay`: Distributed Execution
+
+This implementation swaps `multiprocessing` for Ray Actors.
+
+### 2.1 Worker Actor
+
+```python
+# adtools/sandbox/sandbox_executor_ray.py
+
+class _RayWorker:
+    def __init__(self, evaluate_worker):
+        self.evaluate_worker = evaluate_worker
+
+    def execute(self, method_name, args, kwargs, ...):
+        # Simply calls the method.
+        # Ray handles the serialization and return values automatically.
+        return getattr(self.evaluate_worker, method_name)(*args, **kwargs)
+```
+
+### 2.2 Execution with Timeout
+
+```python
+# adtools/sandbox/sandbox_executor_ray.py
+
+def secure_execute(self, ...):
+    # Create the remote worker
+    worker = self._RemoteWorkerClass.remote(self.evaluate_worker)
+
+    try:
+        # Schedule execution
+        future = worker.execute.remote(...)
+        
+        # Wait for result with timeout
+        result = ray.get(future, timeout=timeout_seconds)
+        
+    except GetTimeoutError:
+        # Handle timeout
+        return ExecutionResults(..., error_msg="Evaluation timeout.")
+        
+    finally:
+        # Crucial: Kill the actor to free resources (GPU/Memory)
+        ray.kill(worker, no_restart=True)
+```
+
+**Implementation Insight**:
+- Unlike the process-based executor, we don't need manual shared memory management. Ray's Object Store ("Plasma") automatically handles zero-copy transfer for supported objects.
+- `ray.kill` is the equivalent of `process.terminate()`.
+
+## 3. Decorator Implementation (`@sandbox_run`)
+
+The decorator is a syntax sugar that decides which Executor to instantiate.
+
+```python
+# adtools/sandbox/decorators.py
+
+def sandbox_run(sandbox_type="process", ...):
+    def decorator(func):
+        # 1. Detect if it's a method or function
+        is_class_method = "." in func.__qualname__ 
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if is_class_method:
+                self_instance = args[0]
+                # 2. Prevent infinite recursion
+                # If we are already inside the sandbox (bypassed), just run the function
+                if getattr(self_instance, "_bypass_sandbox", False):
+                    return func(*args, **kwargs)
+                
+                # 3. Create a copy for the worker
+                evaluate_worker = copy.copy(self_instance)
+                evaluate_worker._bypass_sandbox = True
+            else:
+                # Wrap standalone function
+                evaluate_worker = _FunctionWorker(func)
+
+            # 4. Instantiate Executor and Run
+            executor = SandboxExecutor(evaluate_worker, ...)
+            return executor.secure_execute(...)
+            
+        return wrapper
+    return decorator
+```
+
+**Implementation Insight**:
+- **Recursion Prevention**: When `secure_execute` runs, it deserializes the `evaluate_worker` in the new process and calls the method again. We set `_bypass_sandbox = True` on the copy so that inside the child process, the decorator sees the flag and executes the *real* code instead of trying to spawn *another* sandbox (which would lead to an infinite loop of process creation).
