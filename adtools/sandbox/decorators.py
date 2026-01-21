@@ -92,7 +92,7 @@ def sandbox_run(
 
                 executor = SandboxExecutorRay(
                     evaluate_worker,
-                    init_ray=ray.is_initialized(),
+                    init_ray= not ray.is_initialized(),
                     **executor_init_kwargs,
                 )
                 ray_options = ray_actor_options
