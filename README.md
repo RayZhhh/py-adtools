@@ -13,7 +13,7 @@ The figure demonstrates how a Python program is parsed
 into [PyCodeBlock](./adtools/py_code.py#L18-L33), [PyFunction](./adtools/py_code.py#L37-L126), [PyClass](./adtools/py_code.py#L129-L206),
 and [PyProgram](./adtools/py_code.py#L209-L256) via `adtools`.
 
-![pycode](./assets/pycode.png)
+![pycode](./assets/PyCode.png)
 
 ------
 
