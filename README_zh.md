@@ -11,7 +11,7 @@
 
 下图展示了 `adtools` 如何将一段 Python 源代码解析为结构化的 [PyCodeBlock](./adtools/py_code.py#L18-L33)、[PyFunction](./adtools/py_code.py#L37-L126)、[PyClass](./adtools/py_code.py#L129-L206) 和 [PyProgram](./adtools/py_code.py#L209-L256) 对象。
 
-![pycode](./assets/pycode.png)
+![pycode](./assets/PyCode.png)
 
 ------
 
