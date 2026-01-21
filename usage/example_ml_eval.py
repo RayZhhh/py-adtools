@@ -35,7 +35,7 @@ class Trainer:
         batch_size: int = 128,
         epochs: int = 5,
         lr: float = 1e-3,
-        num_workers: int = 4,
+        num_workers: int = 1,
     ):
         mps_available = torch.mps.is_available()
         cuda_available = torch.cuda.is_available()
@@ -72,8 +72,6 @@ class Trainer:
             download=True,
             transform=transform,
         )
-        dataset.data = dataset.data[:50]
-        dataset.targets = dataset.targets[:50]
 
         return DataLoader(
             dataset,
@@ -88,7 +86,7 @@ class Trainer:
 
         total_loss = 0.0
 
-        for images, labels in self.train_loader:
+        for i, (images, labels) in enumerate(self.train_loader):
             images = images.to(self.device)
             labels = labels.to(self.device)
 
@@ -99,6 +97,11 @@ class Trainer:
             self.optimizer.step()
 
             total_loss += loss.item()
+
+            if (i + 1) % 50 == 0:
+                print(
+                    f"Epoch [{epoch}/{self.epochs}] Step [{i+1}/{len(self.train_loader)}] Loss: {loss.item():.4f}"
+                )
 
         avg_loss = total_loss / len(self.train_loader)
         print(f"Epoch [{epoch}/{self.epochs}] - Loss: {avg_loss:.4f}")
@@ -111,10 +114,14 @@ class Trainer:
 if __name__ == "__main__":
     from adtools.sandbox import SandboxExecutor, SandboxExecutorRay
 
-    trainer = SandboxExecutor(Trainer(), debug_mode=True)
-    res = trainer.secure_execute("train", timeout_seconds=20)
+    trainer = SandboxExecutor(
+        Trainer(),
+        find_and_kill_children_evaluation_process=True,
+        debug_mode=True
+    )
+    res = trainer.secure_execute("train", timeout_seconds=50)
     print(res)
 
     trainer = SandboxExecutorRay(Trainer(), debug_mode=True)
-    res = trainer.secure_execute("train", timeout_seconds=20)
+    res = trainer.secure_execute("train", timeout_seconds=50)
     print(res)
