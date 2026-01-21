@@ -55,26 +55,34 @@ class SandboxExecutor:
         self.join_timeout_seconds = join_timeout_seconds
 
     def _kill_process_and_its_children(self, process: multiprocessing.Process):
+        # Find all children processes
+        children_processes = []
         if self.find_and_kill_children_evaluation_process:
-            # Find all children processes
             try:
                 parent = psutil.Process(process.pid)
                 children_processes = parent.children(recursive=True)
             except psutil.NoSuchProcess:
                 children_processes = []
-        else:
-            children_processes = []
+
         # Terminate parent process
         process.terminate()
         process.join(timeout=self.join_timeout_seconds)
         if process.is_alive():
             process.kill()
             process.join()
+
         # Kill all children processes
         for child in children_processes:
-            if self.debug_mode:
-                print(f"Killing process {process.pid}'s children process {child.pid}")
-            child.terminate()
+            try:
+                if self.debug_mode:
+                    print(
+                        f"Killing process {process.pid}'s children process {child.pid}"
+                    )
+                if child.is_running():
+                    child.terminate()
+            except:
+                if self.debug_mode:
+                    traceback.print_exc()
 
     def _execute_and_put_res_in_shared_memory(
         self,
