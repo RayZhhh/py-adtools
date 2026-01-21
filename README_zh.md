@@ -6,6 +6,7 @@
 <a href="https://github.com/RayZhhh/py-adtools"><img src="https://img.shields.io/github/stars/RayZhhh/py-adtools?style=social" alt="GitHub stars"></a>
 <a href="https://github.com/RayZhhh/py-adtools/blob/main/LICENSE"><img src="https://img.shields.io/github/license/RayZhhh/py-adtools" alt="License"></a>
 <a href="https://deepwiki.com/RayZhhh/py-adtools"><img src="./assets/deepwiki-badge.png" alt="Ask DeepWiki.com" style="height:20px;"></a>
+<img src="https://img.shields.io/badge/python-%3E%3D3.10-blue" alt="Python Version">
 </div>
 <br>
 
