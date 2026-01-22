@@ -58,13 +58,17 @@ def sandbox_run(
     Returns:
         A decorator that returns ExecutionResults when the decorated method/function is called.
     """
+    # Followings are to cheat IDE
+    executor_init_kwargs.get("debug_mode", False)
+    executor_init_kwargs.get("init_ray", None)
+    executor_init_kwargs.get("find_and_kill_children_evaluation_process", False)
 
     def decorator(func: Callable) -> Callable:
-        is_method_likely = _is_class_method(func)  # noqa
+        is_class_method = _is_class_method(func)  # noqa
 
         @wraps(func)
         def wrapper(*args, **kwargs) -> ExecutionResults:
-            if is_method_likely:
+            if is_class_method:
                 # Treated as a method call: args[0] is 'self'
                 if not args:
                     raise RuntimeError("Method call expected 'self' as first argument.")
@@ -90,9 +94,13 @@ def sandbox_run(
             if sandbox_type == "ray":
                 import ray
 
+                init_ray = executor_init_kwargs.get("init_ray", None)
+                if init_ray is None:
+                    init_ray = not ray.is_initialized()
+
                 executor = SandboxExecutorRay(
                     evaluate_worker,
-                    init_ray= not ray.is_initialized(),
+                    init_ray=init_ray,
                     **executor_init_kwargs,
                 )
                 ray_options = ray_actor_options
@@ -124,26 +132,3 @@ def sandbox_run(
         return wrapper
 
     return decorator
-
-
-# class Worker:
-#     @sandbox_run(sandbox_type="ray", timeout=None, redirect_to_devnull=False)
-#     def double(self, a):
-#         return a * 2
-#
-#
-# @sandbox_run(sandbox_type="ray")
-# def square(a):
-#     return a * a
-#
-#
-# if __name__ == "__main__":
-#     # Test Class Method
-#     worker = Worker()
-#     res_method = worker.double(5)
-#     print(f"Method Result: {res_method}")
-#
-#     # Test Standalone Function
-#     res_func = square(4)
-#     print(f"Function Result: {res_func}")
-#     print(square.__name__)

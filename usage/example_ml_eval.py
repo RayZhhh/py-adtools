@@ -35,7 +35,7 @@ class Trainer:
         batch_size: int = 128,
         epochs: int = 5,
         lr: float = 1e-3,
-        num_workers: int = 1,
+        num_workers: int = 2,
     ):
         mps_available = torch.mps.is_available()
         cuda_available = torch.cuda.is_available()
