@@ -106,27 +106,6 @@ class SandboxExecutorRay(SandboxExecutor):
         else:
             ray_actor_options = ray_actor_options.copy()
 
-        # Propagate sys.path and PYTHONPATH
-        runtime_env = ray_actor_options.get("runtime_env", {})
-        env_vars = runtime_env.get("env_vars", {})
-
-        current_paths = [p for p in sys.path if p and os.path.exists(p)]
-        existing_pythonpath = env_vars.get("PYTHONPATH", "")
-        if existing_pythonpath:
-            current_paths.insert(0, existing_pythonpath)
-
-        # Deduplicate preserving order
-        unique_paths = []
-        seen = set()
-        for p in current_paths:
-            if p not in seen:
-                unique_paths.append(p)
-                seen.add(p)
-
-        env_vars["PYTHONPATH"] = os.pathsep.join(unique_paths)
-        runtime_env["env_vars"] = env_vars
-        ray_actor_options["runtime_env"] = runtime_env
-
         # Create worker
         worker = self._RemoteWorkerClass.options(**ray_actor_options).remote(
             self.evaluate_worker

@@ -10,7 +10,7 @@
 </div>
 <br>
 
-下图展示了 `adtools` 如何将一段 Python 源代码解析为结构化的 [PyCodeBlock](./adtools/py_code.py#L18-L33)、[PyFunction](./adtools/py_code.py#L37-L126)、[PyClass](./adtools/py_code.py#L129-L206) 和 [PyProgram](./adtools/py_code.py#L209-L256) 对象。
+下图展示了 `adtools` 如何将一段 Python 源代码解析为结构化的 [PyCodeBlock](./adtools/py_code.py#L17-L32)、[PyFunction](./adtools/py_code.py#L36-L125)、[PyClass](./adtools/py_code.py#L128-L205) 和 [PyProgram](./adtools/py_code.py#L208-L255) 对象。
 
 ![pycode](./assets/PyCode.png)
 
@@ -126,7 +126,7 @@ print(p.functions[0].name)
 - **结构无损**：严格保留原始代码的缩进和格式。
 - **智能处理多行字符串**：即使代码中包含复杂的 SQL 或长文本，也能正确识别，不会误伤其中的缩进。
 - **便捷操作**：像操作对象属性一样修改函数名、文档或代码体。
-- **全量还原**：[PyProgram](./adtools/py_code.py#L209-L256) 能够将修改后的组件完美还原为可执行的 Python 代码。
+- **全量还原**：[PyProgram](./adtools/py_code.py#L208-L255) 能够将修改后的组件完美还原为可执行的 Python 代码。
 
 ## 安全沙盒：`sandbox`
 

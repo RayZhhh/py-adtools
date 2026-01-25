@@ -12,3 +12,4 @@ debug
 _debug
 .venv
 **/*.egg-info
+adtools/ad_agent

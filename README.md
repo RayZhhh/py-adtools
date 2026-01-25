@@ -11,8 +11,8 @@
 <br>
 
 The figure demonstrates how a Python program is parsed
-into [PyCodeBlock](./adtools/py_code.py#L18-L33), [PyFunction](./adtools/py_code.py#L37-L126), [PyClass](./adtools/py_code.py#L129-L206),
-and [PyProgram](./adtools/py_code.py#L209-L256) via `adtools`.
+into [PyCodeBlock](./adtools/py_code.py#L17-L32), [PyFunction](./adtools/py_code.py#L36-L125), [PyClass](./adtools/py_code.py#L128-L205),
+and [PyProgram](./adtools/py_code.py#L208-L255) via `adtools`.
 
 ![pycode](./assets/PyCode.png)
 
@@ -129,7 +129,7 @@ print(p.functions[0].name)
 - **Handles Multiline Strings**: Properly preserves multiline string content without incorrect indentation
 - **Access to Components**: Easily access functions, classes, and code blocks
 - **Modify Code Elements**: Change function names, docstrings, or body content programmatically
-- **Complete Program Representation**: [PyProgram](./adtools/py_code.py#L209-L256) maintains the exact sequence of
+- **Complete Program Representation**: [PyProgram](./adtools/py_code.py#L208-L255) maintains the exact sequence of
   elements as they appear in the source code
 
 ## Safe Execution with `sandbox`
