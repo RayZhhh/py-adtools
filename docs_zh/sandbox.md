@@ -92,16 +92,16 @@ def _execute_and_put_res_in_shared_memory(self, ..., shm_name_id):
 # adtools/sandbox/sandbox_executor.py
 
 def _kill_process_and_its_children(self, process):
-    if self.find_and_kill_children_evaluation_process:
+    if self.recur_kill_eval_proc:
         try:
             parent = psutil.Process(process.pid)
             children = parent.children(recursive=True)
         except psutil.NoSuchProcess:
             children = []
-            
+
     process.terminate()
     # ... join ...
-    
+
     for child in children:
         child.terminate()
 ```

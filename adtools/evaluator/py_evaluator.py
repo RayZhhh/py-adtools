@@ -45,7 +45,7 @@ class PyEvaluator(ABC):
         self.exec_code = exec_code
         self.sandbox_executor = SandboxExecutor(
             evaluate_worker=self,
-            find_and_kill_children_evaluation_process=find_and_kill_children_evaluation_process,
+            recur_kill_eval_proc=find_and_kill_children_evaluation_process,
             debug_mode=debug_mode,
             join_timeout_seconds=join_timeout_seconds,
         )

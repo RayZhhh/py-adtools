@@ -81,7 +81,6 @@ class SandboxExecutorRay(SandboxExecutor):
         redirect_to_devnull: bool = False,
         *,
         ray_actor_options: dict[str, Any] = None,
-        **kwargs,
     ) -> ExecutionResults:
         """Evaluates the program in a separate Ray Actor (process).
         This enables timeout restriction and output redirection.

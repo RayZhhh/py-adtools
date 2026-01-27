@@ -116,12 +116,12 @@ if __name__ == "__main__":
 
     trainer = SandboxExecutor(
         Trainer(),
-        find_and_kill_children_evaluation_process=True,
+        recur_kill_eval_proc=True,
         debug_mode=True
     )
-    res = trainer.secure_execute("train", timeout_seconds=50)
+    res = trainer.secure_execute("train", timeout_seconds=20)
     print(res)
 
     trainer = SandboxExecutorRay(Trainer(), debug_mode=True)
-    res = trainer.secure_execute("train", timeout_seconds=50)
+    res = trainer.secure_execute("train", timeout_seconds=20)
     print(res)

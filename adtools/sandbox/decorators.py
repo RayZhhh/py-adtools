@@ -5,8 +5,7 @@ NOTICE: This code is under MIT license.
 """
 
 import copy
-import inspect
-from functools import wraps
+import functools
 from typing import Literal, Optional, Any, Callable, Dict
 
 from adtools.sandbox.sandbox_executor import SandboxExecutor, ExecutionResults
@@ -61,12 +60,12 @@ def sandbox_run(
     # Followings are to cheat IDE
     executor_init_kwargs.get("debug_mode", False)
     executor_init_kwargs.get("init_ray", None)
-    executor_init_kwargs.get("find_and_kill_children_evaluation_process", False)
+    executor_init_kwargs.get("recur_kill_eval_proc", False)
 
     def decorator(func: Callable) -> Callable:
         is_class_method = _is_class_method(func)  # noqa
 
-        @wraps(func)
+        @functools.wraps(func)
         def wrapper(*args, **kwargs) -> ExecutionResults:
             if is_class_method:
                 # Treated as a method call: args[0] is 'self'

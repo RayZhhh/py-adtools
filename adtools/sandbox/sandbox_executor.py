@@ -32,7 +32,7 @@ class SandboxExecutor:
     def __init__(
         self,
         evaluate_worker: Any,
-        find_and_kill_children_evaluation_process: bool = False,
+        recur_kill_eval_proc: bool = False,
         debug_mode: bool = False,
         *,
         join_timeout_seconds: int = 10,
@@ -41,7 +41,7 @@ class SandboxExecutor:
 
         Args:
             evaluate_worker: The worker object to be executed.
-            find_and_kill_children_evaluation_process: If using 'self.secure_evaluate', kill children processes
+            recur_kill_eval_proc: If using 'self.secure_evaluate', kill children processes
                 when they are terminated. Note that it is suggested to set to 'False' if the evaluation process
                 does not start new processes.
             debug_mode: Debug mode.
@@ -49,15 +49,13 @@ class SandboxExecutor:
         """
         self.evaluate_worker = evaluate_worker
         self.debug_mode = debug_mode
-        self.find_and_kill_children_evaluation_process = (
-            find_and_kill_children_evaluation_process
-        )
+        self.recur_kill_eval_proc = recur_kill_eval_proc
         self.join_timeout_seconds = join_timeout_seconds
 
     def _kill_process_and_its_children(self, process: multiprocessing.Process):
         # Find all children processes
         children_processes = []
-        if self.find_and_kill_children_evaluation_process:
+        if self.recur_kill_eval_proc:
             try:
                 parent = psutil.Process(process.pid)
                 children_processes = parent.children(recursive=True)
@@ -146,7 +144,6 @@ class SandboxExecutor:
         method_kwargs: Optional[Dict] = None,
         timeout_seconds: int | float = None,
         redirect_to_devnull: bool = False,
-        **kwargs,
     ) -> ExecutionResults:
         """Evaluate program in a new process.
         This enables timeout restriction and output redirection.
