@@ -111,7 +111,7 @@ class Trainer:
     @sandbox_run(
         sandbox_type="process",
         timeout=20,
-        find_and_kill_children_evaluation_process=True,
+        recur_kill_eval_proc=True,
     )
     def train_mp_sandbox(self):
         for epoch in range(1, self.epochs + 1):
