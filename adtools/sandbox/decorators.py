@@ -37,6 +37,7 @@ def sandbox_run(
     timeout: Optional[float] = None,
     redirect_to_devnull: bool = False,
     ray_actor_options: Optional[Dict[str, Any]] = None,
+    return_raw_result: bool = True,
     **executor_init_kwargs,
 ):
     """Decorator to execute a class method or standalone function in a sandbox (Process or Ray).
@@ -51,6 +52,7 @@ def sandbox_run(
         redirect_to_devnull: Whether to redirect stdout/stderr to /dev/null
                              inside the sandbox.
         ray_actor_options: Options for the Ray actor (only used if sandbox_type='ray').
+        return_raw_result: Whether to return raw results or ExecutionResults.
         **executor_init_kwargs: Additional keyword arguments passed to the
                                 Executor's constructor (e.g., debug_mode, init_ray).
 
@@ -126,7 +128,7 @@ def sandbox_run(
                     redirect_to_devnull=redirect_to_devnull,
                 )
 
-            return result
+            return result["result"] if return_raw_result else result
 
         return wrapper
 

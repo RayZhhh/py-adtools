@@ -12,4 +12,6 @@ debug
 _debug
 .venv
 **/*.egg-info
+adtools/agent
 adtools/ad_agent
+adtools/algo_search

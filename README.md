@@ -1,4 +1,6 @@
-# Useful code parser, sandbox, and evaluator for LLM-aided algorithm design/code optimization
+![llm-aad](./assets/llm-aad.png)
+
+# Useful code parser, sandbox, and search agents for LLM-aided algorithm design/code optimization
 
 [中文版](./README_zh.md)
 
@@ -38,12 +40,12 @@ pip install py-adtools
 
 ## Tutorials
 
-| Tutorial | Colab |
-| :--- | :--- |
-| **01. Code Parsing** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/RayZhhh/py-adtools/blob/main/tutorial/01_py_code.ipynb) |
-| **02. Safe Execution** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/RayZhhh/py-adtools/blob/main/tutorial/02_sandbox.ipynb) |
-| **03. Decorators** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/RayZhhh/py-adtools/blob/main/tutorial/03_decorators.ipynb) |
-| **04. Evaluators** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/RayZhhh/py-adtools/blob/main/tutorial/04_evaluator.ipynb) |
+| Tutorial               | Colab                                                                                                                                                                            |
+|:-----------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **01. Code Parsing**   | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/RayZhhh/py-adtools/blob/main/tutorial/01_py_code.ipynb)    |
+| **02. Safe Execution** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/RayZhhh/py-adtools/blob/main/tutorial/02_sandbox.ipynb)    |
+| **03. Decorators**     | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/RayZhhh/py-adtools/blob/main/tutorial/03_decorators.ipynb) |
+| **04. Evaluators**     | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/RayZhhh/py-adtools/blob/main/tutorial/04_evaluator.ipynb)  |
 
 ## Code Parsing with [py_code](./adtools/py_code.py)
 
@@ -214,14 +216,17 @@ if __name__ == "__main__":
 
 ### Decorator Usage
 
-For simpler use cases, you can use the `@sandbox_run` decorator to execute functions or methods in a sandbox automatically.
+For simpler use cases, you can use the `@sandbox_run` decorator to execute functions or methods in a sandbox
+automatically.
 
 ```python
 from adtools.sandbox import sandbox_run
 
+
 @sandbox_run(timeout=5.0)
 def calculate(x):
     return x ** 2
+
 
 # Executed in a separate process
 res = calculate(10)
